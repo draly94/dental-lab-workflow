@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦷 Designer Dashboard — Dental Workflow</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="designer-dashboard.html" class="brand">🦷 <span data-i18n="appName">Dental Workflow</span></a>
+      
+      <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      
+      <div class="nav-links" id="nav-links">
+        <a href="designer-dashboard.html" class="active" data-i18n="myCases">My Cases</a>
+                <a href="wallet.html" >Wallet</a>
+<button class="notification-bell" onclick="window.location.href='notifications.html'" style="position:relative;">
+  🔔
+  <span class="badge-dot"></span>
+  <span class="notification-count" style="position:absolute; top:-4px; right:-4px; background:var(--color-danger); color:white; font-size:0.65rem; min-width:16px; height:16px; border-radius:10px; display:none; line-height:16px; text-align:center; padding:0 4px;"></span>
+</button>
+      </div>
+      
+      <div class="user-menu">
+        <button class="btn-lang" id="lang-toggle" onclick="toggleLanguage()">عربي</button>
+        <span class="user-name">Demo Designer</span>
+        <button class="btn-logout" onclick="handleLogout()" data-i18n="logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="page-container">
+
+    <!-- Availability Toggle -->
+    <div style="background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <strong style="font-size:0.95rem;" data-i18n="availabilityStatus">Availability Status</strong>
+        <p style="margin:0; font-size:0.85rem; color: var(--color-muted);" id="availability-text" data-i18n="availableMessage">You are currently available for new cases.</p>
+      </div>
+      <button id="availability-toggle" class="secondary" onclick="toggleAvailability()" style="min-width: 140px;" data-i18n="setUnavailable">Set Unavailable</button>
+    </div>
+
+    <!-- Stats Bar -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">
+      <div class="info-card" style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: var(--color-primary);" id="stat-active">2</div>
+        <div style="font-size: 0.8rem; color: var(--color-muted);" data-i18n="activeCases">Active Cases</div>
+      </div>
+      <div class="info-card" style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: var(--color-success);" id="stat-month">8</div>
+        <div style="font-size: 0.8rem; color: var(--color-muted);" data-i18n="completedMonth">Completed This Month</div>
+      </div>
+      <div class="info-card" style="text-align: center;">
+        <div style="font-size: 2rem; font-weight: 700; color: var(--color-warning);" id="stat-rating">4.8</div>
+        <div style="font-size: 0.8rem; color: var(--color-muted);" data-i18n="averageRating">Average Rating</div>
+      </div>
+    </div>
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 data-i18n="assignedCases">Assigned Cases</h1>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+      <button class="filter-tab active" onclick="filterCases('all', this)" data-i18n="allCases">All Active</button>
+      <button class="filter-tab" onclick="filterCases('assigned', this)" data-i18n="newStatus">New</button>
+      <button class="filter-tab" onclick="filterCases('in_progress', this)" data-i18n="inProgress">In Progress</button>
+      <button class="filter-tab" onclick="filterCases('submitted', this)" data-i18n="submitted">Submitted</button>
+      <button class="filter-tab" onclick="filterCases('approved', this)" data-i18n="completed">Completed</button>
+      <input type="text" class="search-input" data-i18n-placeholder="searchCases" placeholder="Search cases..." oninput="searchCases(this.value)">
+    </div>
+
+    <!-- Case Grid -->
+    <div id="cases-grid" class="case-grid"></div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="empty-state d-none">
+      <div class="icon">🎨</div>
+      <h3 data-i18n="noCasesFound">No cases found</h3>
+      <p data-i18n="designerEmptyMessage">When a lab submits a case and an admin assigns it to you, it will appear here.</p>
+    </div>
+
+  </main>
+
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- App Scripts -->
+<script src="js/config.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/router.js"></script>
+  <script src="js/cases.js"></script>
+  <script src="js/files.js"></script>
+<script src="js/i18n.js"></script>
+<script>
+  // ==========================================
+  // Designer Dashboard — Real data from Supabase
+  // ==========================================
+
+  let currentFilter = 'all';
+  let currentSearch = '';
+  let allCases = [];
+  let currentUser = null;
+  let isAvailable = true;
+
+  function formatDate(d) {
+    if (!d) return t('notSet');
+    const locale = currentLang === 'ar' ? 'ar-EG' : 'en-US';
+    return new Date(d).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function getDaysRemaining(dueDate) {
+    if (!dueDate) return null;
+    const now = new Date();
+    const due = new Date(dueDate);
+    const diff = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+    return diff;
+  }
+
+  function renderCases(cases) {
+    const grid = document.getElementById('cases-grid');
+    const empty = document.getElementById('empty-state');
+
+    if (!cases || cases.length === 0) {
+      grid.innerHTML = '';
+      empty.classList.remove('d-none');
+      return;
+    }
+
+    empty.classList.add('d-none');
+    grid.innerHTML = cases.map(function(c) {
+      const daysRemaining = getDaysRemaining(c.due_date);
+      let daysColor = 'var(--color-muted)';
+      let daysText = '';
+      
+      if (daysRemaining !== null) {
+        if (daysRemaining <= 0) {
+          daysColor = 'var(--color-danger)';
+          daysText = t('overdue');
+        } else if (daysRemaining <= 3) {
+          daysColor = 'var(--color-danger)';
+          daysText = daysRemaining + ' ' + t('daysLeft');
+        } else if (daysRemaining <= 7) {
+          daysColor = 'var(--color-warning)';
+          daysText = daysRemaining + ' ' + t('daysLeft');
+        } else {
+          daysText = daysRemaining + ' ' + t('daysLeft');
+        }
+      }
+
+      return '<a href="case-detail.html?id=' + c.id + '" class="case-card">' +
+        '<div class="card-header">' +
+          '<h3>' + c.name + '</h3>' +
+          '<span class="badge ' + c.status + '">' + t('status_' + c.status) + '</span>' +
+        '</div>' +
+        '<div class="card-meta">' +
+          '<span>👤 ' + (c.patient_name || t('none')) + '</span>' +
+          '<span>📋 ' + t('spec_' + c.specialty) + '</span>' +
+        '</div>' +
+        '<div class="card-meta">' +
+          '<span>🏥 ' + (c.lab ? c.lab.full_name : t('none')) + '</span>' +
+        '</div>' +
+        '<div class="card-footer">' +
+          '<span>📅 ' + t('due') + ': ' + (c.due_date ? formatDate(c.due_date) : t('notSet')) + '</span>' +
+          '<span style="color: ' + daysColor + ';">' + (daysText || '') + '</span>' +
+        '</div>' +
+      '</a>';
+    }).join('');
+  }
+
+  function getFilteredCases() {
+    let filtered = allCases;
+    if (currentFilter !== 'all') {
+      filtered = filtered.filter(function(c) { return c.status === currentFilter; });
+    }
+    if (currentSearch) {
+      const s = currentSearch.toLowerCase();
+      filtered = filtered.filter(function(c) {
+        return c.name.toLowerCase().indexOf(s) !== -1 ||
+          (c.lab && c.lab.full_name && c.lab.full_name.toLowerCase().indexOf(s) !== -1) ||
+          (c.patient_name && c.patient_name.toLowerCase().indexOf(s) !== -1);
+      });
+    }
+    return filtered;
+  }
+
+  window.filterCases = function(status, btn) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+    btn.classList.add('active');
+    renderCases(getFilteredCases());
+  };
+
+  window.searchCases = function(query) {
+    currentSearch = query;
+    renderCases(getFilteredCases());
+  };
+
+  // Toggle availability
+  window.toggleAvailability = async function() {
+    isAvailable = !isAvailable;
+    const btn = document.getElementById('availability-toggle');
+    const text = document.getElementById('availability-text');
+    
+    // Update in database
+    const client = getSupabase();
+    if (client) {
+      await client
+        .from('profiles')
+        .update({ is_active: isAvailable })
+        .eq('id', currentUser.id);
+    }
+    
+    if (isAvailable) {
+      btn.textContent = t('setUnavailable');
+      btn.className = 'secondary';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+      text.textContent = t('availableMessage');
+    } else {
+      btn.textContent = t('setAvailable');
+      btn.style.borderColor = 'var(--color-danger)';
+      btn.style.color = 'var(--color-danger)';
+      text.textContent = t('unavailableMessage');
+    }
+  };
+
+  // Load availability status from DB
+  async function loadAvailability() {
+    const client = getSupabase();
+    if (!client) return;
+    
+    const { data } = await client
+      .from('profiles')
+      .select('is_active')
+      .eq('id', currentUser.id)
+      .single();
+    
+    if (data) {
+      isAvailable = data.is_active;
+      const btn = document.getElementById('availability-toggle');
+      const text = document.getElementById('availability-text');
+      
+      if (isAvailable) {
+        btn.textContent = t('setUnavailable');
+        btn.className = 'secondary';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+        text.textContent = t('availableMessage');
+      } else {
+        btn.textContent = t('setAvailable');
+        btn.style.borderColor = 'var(--color-danger)';
+        btn.style.color = 'var(--color-danger)';
+        text.textContent = t('unavailableMessage');
+      }
+    }
+  }
+
+  // Load stats
+  async function loadStats() {
+    const client = getSupabase();
+    if (!client) return;
+    
+    // Active cases count
+    const { data: active } = await client
+      .from('cases')
+      .select('id', { count: 'exact' })
+      .eq('designer_id', currentUser.id)
+      .in('status', ['assigned', 'in_progress', 'submitted', 'revision_requested']);
+    
+    document.getElementById('stat-active').textContent = active ? active.length : 0;
+    
+    // Completed this month
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const { data: completed } = await client
+      .from('cases')
+      .select('id', { count: 'exact' })
+      .eq('designer_id', currentUser.id)
+      .eq('status', 'approved')
+      .gte('updated_at', firstOfMonth);
+    
+    document.getElementById('stat-month').textContent = completed ? completed.length : 0;
+  }
+
+  window.toggleMenu = function() {
+    document.getElementById('nav-links').classList.toggle('open');
+  };
+
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.nav-links a')) {
+      document.getElementById('nav-links').classList.remove('open');
+    }
+  });
+
+  window.rerenderPage = function() {
+    renderCases(getFilteredCases());
+    const btn = document.getElementById('availability-toggle');
+    const text = document.getElementById('availability-text');
+    if (isAvailable) {
+      btn.textContent = t('setUnavailable');
+      text.textContent = t('availableMessage');
+    } else {
+      btn.textContent = t('setAvailable');
+      text.textContent = t('unavailableMessage');
+    }
+  };
+
+  // ==========================================
+  // Auth guard
+  // ==========================================
+  (async function() {
+    var user = await guardPage(['designer', 'admin']);
+    if (!user) return;
+    
+    currentUser = user;
+    console.log('✅ Designer dashboard loaded for:', user.email);
+    
+    var nameEls = document.querySelectorAll('.user-name');
+    var userName = (user.user_metadata && user.user_metadata.full_name) || user.email;
+    nameEls.forEach(function(el) { el.textContent = userName; });
+    
+    // Load availability
+    await loadAvailability();
+    
+    // Load stats
+    await loadStats();
+    
+    // Load cases
+    console.log('📥 Loading designer cases...');
+    allCases = await getDesignerCases(currentUser.id);
+    console.log('✅ Loaded ' + allCases.length + ' cases');
+    renderCases(getFilteredCases());
+  })();
+</script>
+<script src="js/notifications.js"></script>
+<script>
+  (async function() {
+    await updateNotificationBadge();
+    var user = await getCurrentUser();
+    if (user) subscribeToNotifications(user.id, function() { updateNotificationBadge(); });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦷 Dental Workflow — Login</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="login-page">
+
+  <div class="login-box">
+    <div class="logo">🦷</div>
+    <h1 data-i18n="appName">Dental Workflow</h1>
+    <p class="subtitle" data-i18n="appSubtitle">Connect labs with digital designers</p>
+
+    <!-- Language Toggle -->
+    <div class="lang-toggle-login">
+      <button id="lang-toggle" onclick="toggleLanguage()">عربي</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="tab-login" onclick="switchTab('login')" data-i18n="login">Login</button>
+      <button class="tab" id="tab-signup" onclick="switchTab('signup')" data-i18n="signUp">Sign Up</button>
+    </div>
+
+    <!-- Login Form -->
+    <form id="login-form" class="auth-form active" onsubmit="handleLogin(event)">
+      <label>
+        <span data-i18n="email">Email</span>
+        <input type="email" id="login-email" placeholder="you@example.com" required>
+      </label>
+      <label>
+        <span data-i18n="password">Password</span>
+        <input type="password" id="login-password" placeholder="••••••••" required minlength="6">
+      </label>
+      <div id="login-error" class="error-message"></div>
+      <button type="submit" id="login-btn" data-i18n="login">Login</button>
+    </form>
+
+    <!-- Signup Form -->
+    <form id="signup-form" class="auth-form" onsubmit="handleSignup(event)">
+      <label>
+        <span data-i18n="fullName">Full Name</span>
+        <input type="text" id="signup-name" placeholder="Dr. Ahmed" required>
+      </label>
+      <label>
+        <span data-i18n="email">Email</span>
+        <input type="email" id="signup-email" placeholder="you@example.com" required>
+      </label>
+      <label>
+        <span data-i18n="password">Password</span>
+        <input type="password" id="signup-password" placeholder="Min 6 characters" required minlength="6">
+      </label>
+      <label>
+        <span data-i18n="role">I am a</span>
+        <select id="signup-role" required>
+          <option value="" data-i18n="selectRole">Select role...</option>
+          <option value="lab" data-i18n="lab">Dental Lab</option>
+          <option value="designer" data-i18n="designer">Digital Designer</option>
+        </select>
+      </label>
+      <div id="signup-error" class="error-message"></div>
+      <button type="submit" id="signup-btn" data-i18n="createAccount">Create Account</button>
+    </form>
+
+    <p class="text-center text-muted mt-2" style="font-size:0.8rem; font-style:italic;" data-i18n="demoNote">
+      Auth will be connected in Week 2
+    </p>
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+<!-- App Scripts (order matters) -->
+<script src="js/config.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>    <!-- ← ADD THIS LINE -->
+<script src="js/i18n.js"></script>
+  <script>
+    // ==========================================
+    // Auth — Day 8: Supabase signup (real)
+    // Login still fake for now
+    // ==========================================
+
+    // Tab switching
+    window.switchTab = function(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+      
+      if (tab === 'login') {
+        document.getElementById('tab-login').classList.add('active');
+        document.getElementById('login-form').classList.add('active');
+      } else {
+        document.getElementById('tab-signup').classList.add('active');
+        document.getElementById('signup-form').classList.add('active');
+      }
+      
+      document.getElementById('login-error').classList.remove('visible');
+      document.getElementById('signup-error').classList.remove('visible');
+    };
+
+    // ==========================================
+    // REAL SUPABASE SIGNUP
+    // ==========================================
+window.handleSignup = async function(event) {
+  event.preventDefault();
+  
+  var name = document.getElementById('signup-name').value.trim();
+  var email = document.getElementById('signup-email').value.trim();
+  var password = document.getElementById('signup-password').value;
+  var role = document.getElementById('signup-role').value;
+  var errorEl = document.getElementById('signup-error');
+  var btn = document.getElementById('signup-btn');
+  
+  if (!role) {
+    errorEl.textContent = 'Please select a role.';
+    errorEl.classList.add('visible');
+    return;
+  }
+  
+  if (password.length < 6) {
+    errorEl.textContent = 'Password must be at least 6 characters.';
+    errorEl.classList.add('visible');
+    return;
+  }
+
+  errorEl.classList.remove('visible');
+  btn.textContent = 'Creating account...';
+  btn.disabled = true;
+  
+  try {
+    var client = getSupabase();
+    
+    console.log('🔐 Signing up:', email, 'as', role);
+    
+    var result = await client.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          full_name: name,
+          role: role
+        }
+      }
+    });
+    
+    if (result.error) {
+      throw result.error;
+    }
+    
+    console.log('✅ Signup response:', result);
+    
+    // If user was created but not confirmed, still success
+    if (result.data.user) {
+      console.log('✅ User created:', result.data.user.id);
+      
+      // Wait a moment for trigger to complete
+      await sleep(1000);
+      
+      alert('Account created! You can log in now.');
+      switchTab('login');
+      document.getElementById('login-email').value = email;
+    }
+    
+  } catch (err) {
+    console.error('Signup error:', err);
+    var msg = err.message || 'Unknown error';
+    if (msg.indexOf('already registered') !== -1 || msg.indexOf('already exists') !== -1) {
+      msg = 'This email is already registered. Please log in.';
+    }
+    errorEl.textContent = msg;
+    errorEl.classList.add('visible');
+  }
+  
+  btn.textContent = 'Create Account';
+  btn.disabled = false;
+};
+
+function sleep(ms) {
+  return new Promise(function(r) { setTimeout(r, ms); });
+}
+
+// ==========================================
+// REAL SUPABASE LOGIN
+// ==========================================
+
+window.handleLogin = async function(event) {
+  event.preventDefault();
+  
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  
+  if (password.length < 6) {
+    errorEl.textContent = currentLang === 'ar' 
+      ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.' 
+      : 'Password must be at least 6 characters.';
+    errorEl.classList.add('visible');
+    return;
+  }
+  
+  errorEl.classList.remove('visible');
+  btn.textContent = currentLang === 'ar' ? 'جاري تسجيل الدخول...' : 'Logging in...';
+  btn.disabled = true;
+  
+  console.log('🔐 Attempting login for:', email);
+  
+  const { data, error } = await signIn(email, password);
+  
+  if (error) {
+    console.error('Login error:', error.message);
+    
+    let msg = error.message;
+    if (error.message.includes('Invalid login credentials')) {
+      msg = currentLang === 'ar' 
+        ? 'بريد إلكتروني أو كلمة مرور غير صحيحة.'
+        : 'Invalid email or password.';
+    }
+    
+    errorEl.textContent = msg;
+    errorEl.classList.add('visible');
+    btn.textContent = currentLang === 'ar' ? 'تسجيل الدخول' : 'Login';
+    btn.disabled = false;
+    return;
+  }
+  
+  console.log('✅ Login successful:', data.user.email);
+  
+  // Redirect based on role
+  const role = getUserRole(data.user);
+  console.log('   Role:', role);
+  redirectByRole(role);
+};
+    // Re-render translations after language switch
+    window.rerenderPage = function() {
+      document.getElementById('tab-login').textContent = t('login');
+      document.getElementById('tab-signup').textContent = t('signUp');
+      const select = document.getElementById('signup-role');
+      if (select) {
+        select.options[0].textContent = t('selectRole');
+        select.options[1].textContent = t('lab');
+        select.options[2].textContent = t('designer');
+      }
+      document.getElementById('login-btn').textContent = t('login');
+      document.getElementById('signup-btn').textContent = t('createAccount');
+    };
+  </script>
+
+</body>
+</html>

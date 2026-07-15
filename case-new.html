@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦷 New Case — Dental Workflow</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    /* Two column layout for larger screens */
+    .case-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      max-width: 1100px;
+    }
+    @media (max-width: 768px) {
+      .case-form-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+      }
+    }
+    .quantity-control {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .quantity-control button {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      font-size: 1.2rem;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .quantity-control button:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+    .quantity-control .qty-display {
+      font-size: 1.2rem;
+      font-weight: 700;
+      min-width: 40px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="brand">🦷 Dental Workflow</a>
+      <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      <div class="nav-links" id="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="case-new.html" class="active">New Case</a>
+      </div>
+      <div class="user-menu">
+        <button class="btn-lang" id="lang-toggle" onclick="toggleLanguage()">عربي</button>
+        <span class="user-name">Lab</span>
+        <button class="btn-logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    <div class="page-header">
+      <h1>Create New Case</h1>
+      <a href="dashboard.html">← Back to Dashboard</a>
+    </div>
+
+    <div class="case-form-grid">
+      
+      <!-- LEFT COLUMN: Case Details -->
+      <div>
+        <h3 style="margin-bottom:1rem;">📋 Case Information</h3>
+        
+        <label>
+          Case Name <span style="color: var(--color-danger);">*</span>
+          <input type="text" id="case-name" placeholder="e.g., Crown - Upper Right Molar" required maxlength="200">
+        </label>
+
+        <label>
+          Patient Name
+          <input type="text" id="patient-name" placeholder="e.g., Ahmed S." maxlength="100">
+        </label>
+
+        <label>
+          Specialty <span style="color: var(--color-danger);">*</span>
+          <select id="specialty" required>
+            <option value="">Select specialty...</option>
+            <option value="crown">Crown</option>
+            <option value="bridge">Bridge</option>
+            <option value="implant">Implant</option>
+            <option value="veneer">Veneer</option>
+            <option value="denture">Denture</option>
+            <option value="orthodontic">Orthodontic</option>
+            <option value="night_guard">Night Guard</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <!-- Quantity Counter -->
+        <label>
+          Quantity
+        </label>
+        <div class="quantity-control" style="margin-bottom:1rem;">
+          <button type="button" id="qty-minus">−</button>
+          <span class="qty-display" id="qty-display">1</span>
+          <button type="button" id="qty-plus">+</button>
+        </div>
+
+        <label>
+          Description / Notes
+          <textarea id="description" rows="3" placeholder="Any special instructions..." maxlength="1000"></textarea>
+        </label>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+          <label>
+            Due Date
+            <input type="date" id="due-date">
+          </label>
+          <label style="display:flex; align-items:flex-end; padding-top:0.5rem;">
+            <input type="checkbox" id="is-urgent">
+            Mark as Urgent
+          </label>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Files + Wallet + Upload -->
+      <div>
+        <h3 style="margin-bottom:1rem;">📁 Files & Payment</h3>
+
+        <!-- File Upload -->
+        <label>
+          Upload STL Files <span style="color: var(--color-danger);">*</span>
+          <input type="file" id="scan-files" accept=".stl,.ply,.obj" multiple>
+          <small>Accepted: STL, PLY, OBJ. Add more anytime.</small>
+        </label>
+
+        <!-- File Queue -->
+        <div id="file-queue" class="d-none" style="margin-bottom:1rem;">
+          <div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">
+            Files (<span id="queue-count">0</span>)
+          </div>
+          <div id="queue-items" style="display:flex; flex-direction:column; gap:0.35rem; max-height:180px; overflow-y:auto;"></div>
+        </div>
+
+        <!-- Upload Dashboard -->
+        <div id="upload-dashboard" class="upload-progress d-none">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+            <span id="dash-label" style="font-weight:600; font-size:0.9rem;">Uploading...</span>
+            <span id="dash-percent" style="font-weight:700; font-size:1rem; color:var(--color-primary);">0%</span>
+          </div>
+          <div class="progress-track" style="margin-bottom:0.5rem;">
+            <div id="dash-fill" class="progress-fill" style="width:0%;"></div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.5rem; margin-bottom:0.5rem; font-size:0.78rem;">
+            <div><span style="color:var(--color-muted);">Speed:</span> <span id="dash-speed" style="font-weight:600;">—</span></div>
+            <div><span style="color:var(--color-muted);">ETA:</span> <span id="dash-eta" style="font-weight:600;">—</span></div>
+            <div><span style="color:var(--color-muted);">Files:</span> <span id="dash-files" style="font-weight:600;">0/0</span></div>
+          </div>
+          <div style="font-size:0.75rem; color:var(--color-muted); margin-bottom:0.75rem;">
+            <span id="dash-size">0 / 0</span>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button type="button" id="btn-pause" class="secondary" style="font-size:0.8rem; padding:0.3rem 0.75rem;">⏸ Pause</button>
+            <button type="button" id="btn-resume" class="secondary d-none" style="font-size:0.8rem; padding:0.3rem 0.75rem;">▶ Resume</button>
+            <button type="button" id="btn-cancel-upload" class="secondary" style="font-size:0.8rem; padding:0.3rem 0.75rem; color:var(--color-danger); border-color:var(--color-danger);">✕ Cancel</button>
+          </div>
+          <div id="connection-status" class="d-none" style="margin-top:0.5rem; padding:0.4rem 0.75rem; background:#fef3c7; border-radius:6px; font-size:0.78rem; color:#92400e;">
+            ⚠️ Connection lost. Waiting to reconnect...
+          </div>
+        </div>
+
+        <!-- Wallet + Price Summary -->
+        <div style="background: var(--color-light); padding: 1rem; border-radius: var(--radius); margin-bottom: 1rem;">
+          <div style="font-size:0.85rem; font-weight:600; margin-bottom:0.75rem;">💳 Payment Summary</div>
+          <div class="info-row" style="padding:0.25rem 0;">
+            <span>Unit Price:</span>
+            <span id="unit-price" style="font-weight:600;">$0.00</span>
+          </div>
+          <div class="info-row" style="padding:0.25rem 0;">
+            <span>Quantity:</span>
+            <span id="summary-qty" style="font-weight:600;">1</span>
+          </div>
+          <div class="info-row" style="padding:0.5rem 0; border-top:2px solid var(--color-border); margin-top:0.25rem;">
+            <span style="font-weight:700;">Total:</span>
+            <span id="total-price" style="font-weight:700; font-size:1.1rem; color:var(--color-primary);">$0.00</span>
+          </div>
+          <div class="info-row" style="padding:0.25rem 0;">
+            <span>💰 Your Balance:</span>
+            <span id="wallet-balance" style="font-weight:600;">—</span>
+          </div>
+          <div id="funds-warning" class="d-none" style="margin-top:0.5rem; padding:0.4rem 0.75rem; background:#fecaca; border-radius:6px; font-size:0.8rem; color:#991b1b;">
+            ⚠️ Insufficient funds
+          </div>
+        </div>
+
+        <div id="form-error" class="error-message mt-2"></div>
+
+        <!-- Buttons -->
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button type="button" class="secondary" id="btn-cancel">❌ Cancel</button>
+          <button type="button" id="btn-submit">📤 Submit Case</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/cases.js"></script>
+  <script src="js/files.js"></script>
+  <script src="js/i18n.js"></script>
+
+  <script>
+    var currentUser = null;
+    var uploadManager = null;
+    var caseId = null;
+    var unitPrice = 0;
+    var quantity = 1;
+    var walletBalance = 0;
+    var allFiles = [];
+    var priceListCache = [];
+
+    document.getElementById('due-date').min = new Date().toISOString().split('T')[0];
+
+    // ==========================================
+    // QUANTITY CONTROLS
+    // ==========================================
+    document.getElementById('qty-plus').addEventListener('click', function() {
+      quantity++;
+      updateQuantityDisplay();
+    });
+
+    document.getElementById('qty-minus').addEventListener('click', function() {
+      if (quantity > 1) {
+        quantity--;
+        updateQuantityDisplay();
+      }
+    });
+
+    function updateQuantityDisplay() {
+      document.getElementById('qty-display').textContent = quantity;
+      document.getElementById('summary-qty').textContent = quantity;
+      updateTotalPrice();
+    }
+
+    // ==========================================
+    // PRICE CALCULATION
+    // ==========================================
+    document.getElementById('specialty').addEventListener('change', function() {
+      var specialty = this.value;
+      if (!specialty) {
+        unitPrice = 0;
+        document.getElementById('unit-price').textContent = '$0.00';
+        updateTotalPrice();
+        return;
+      }
+      
+      var price = priceListCache.find(function(p) { return p.specialty === specialty; });
+      if (price) {
+        unitPrice = price.lab_price;
+        document.getElementById('unit-price').textContent = '$' + unitPrice.toFixed(2);
+      } else {
+        unitPrice = 0;
+        document.getElementById('unit-price').textContent = '—';
+      }
+      updateTotalPrice();
+    });
+
+    function updateTotalPrice() {
+      var total = unitPrice * quantity;
+      document.getElementById('total-price').textContent = '$' + total.toFixed(2);
+      checkFunds(total);
+    }
+
+    // ==========================================
+    // WALLET
+    // ==========================================
+    async function loadPriceList() {
+      priceListCache = await getPriceList();
+    }
+
+    async function loadWallet() {
+      var client = getSupabase();
+      if (!client) return;
+      var result = await client.from('wallets').select('balance').eq('user_id', currentUser.id).single();
+      if (result.data) {
+        walletBalance = result.data.balance;
+        document.getElementById('wallet-balance').textContent = '$' + walletBalance.toFixed(2);
+        updateTotalPrice();
+      }
+    }
+
+    function checkFunds(total) {
+      var submitBtn = document.getElementById('btn-submit');
+      var warning = document.getElementById('funds-warning');
+      
+      total = total || (unitPrice * quantity);
+      
+      if (total > 0 && walletBalance < total) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+        warning.classList.remove('d-none');
+        warning.textContent = '⚠️ Insufficient funds. Need $' + total.toFixed(2) + ', have $' + walletBalance.toFixed(2);
+      } else if (total > 0) {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        warning.classList.add('d-none');
+      }
+    }
+
+    // ==========================================
+    // FILES
+    // ==========================================
+    document.getElementById('scan-files').addEventListener('change', function(e) {
+      var newFiles = Array.from(e.target.files);
+      if (newFiles.length === 0) return;
+      allFiles = allFiles.concat(newFiles);
+      if (uploadManager && caseId) { uploadManager.addFiles(newFiles); renderQueue(); updateDashboard(); }
+      else { renderQueue(); }
+      this.value = '';
+    });
+
+    function renderQueue() {
+      var queueDiv = document.getElementById('file-queue');
+      var itemsDiv = document.getElementById('queue-items');
+      if (allFiles.length === 0) { queueDiv.classList.add('d-none'); return; }
+      queueDiv.classList.remove('d-none');
+      document.getElementById('queue-count').textContent = allFiles.length;
+      var totalSize = allFiles.reduce(function(s, f) { return s + f.size; }, 0);
+      itemsDiv.innerHTML = allFiles.map(function(f, i) {
+        return '<div style="display:flex; justify-content:space-between; align-items:center; background:var(--color-light); padding:0.35rem 0.65rem; border-radius:6px; font-size:0.82rem;">' +
+          '<span>📎 ' + f.name + ' <span style="color:var(--color-muted);">(' + formatFileSize(f.size) + ')</span></span>' +
+          '<button type="button" onclick="removeFromQueue(' + i + ')" style="font-size:0.7rem; padding:0.15rem 0.5rem; background:none; border:1px solid #dc2626; border-radius:4px; cursor:pointer; color:#dc2626;">✕</button>' +
+        '</div>';
+      }).join('') +
+      '<div style="font-size:0.72rem; color:var(--color-muted); margin-top:0.25rem;">Total: ' + formatFileSize(totalSize) + '</div>';
+    }
+
+    window.removeFromQueue = function(index) {
+      if (index < 0 || index >= allFiles.length) return;
+      var isCompleted = uploadManager && uploadManager.queue[index] && uploadManager.queue[index].status === 'completed';
+      if (isCompleted) {
+        if (!confirm('Delete "' + allFiles[index].name + '"? This file is already uploaded. You will need to re-upload it.')) return;
+      }
+      if (uploadManager) {
+        var deleted = uploadManager.deleteFile(index);
+        if (!deleted) { alert('Cannot delete file currently uploading.'); return; }
+      }
+      allFiles.splice(index, 1);
+      renderQueue();
+      if (uploadManager) updateDashboard();
+    };
+
+    // ==========================================
+    // UPLOAD DASHBOARD
+    // ==========================================
+    function showDashboard() {
+      document.getElementById('upload-dashboard').classList.remove('d-none');
+      document.getElementById('btn-submit').disabled = true;
+      document.getElementById('btn-submit').textContent = '⏳ Uploading...';
+    }
+
+    function updateDashboard() {
+      if (!uploadManager) return;
+      var stats = uploadManager.getStats();
+      document.getElementById('dash-percent').textContent = stats.totalProgress + '%';
+      document.getElementById('dash-fill').style.width = stats.totalProgress + '%';
+      document.getElementById('dash-speed').textContent = stats.speedFormatted || '—';
+      document.getElementById('dash-eta').textContent = stats.eta || '—';
+      document.getElementById('dash-files').textContent = stats.completed + '/' + stats.total;
+      document.getElementById('dash-size').textContent = formatFileSize(stats.uploadedBytes) + ' / ' + formatFileSize(stats.totalBytes);
+      document.getElementById('dash-label').textContent = stats.isPaused ? '⏸ Paused' : 'Uploading...';
+      
+      var connStatus = document.getElementById('connection-status');
+      if (!stats.isOnline) { connStatus.classList.remove('d-none'); }
+      else { connStatus.classList.add('d-none'); }
+      
+      var btnPause = document.getElementById('btn-pause');
+      var btnResume = document.getElementById('btn-resume');
+      if (stats.isPaused) { btnPause.classList.add('d-none'); btnResume.classList.remove('d-none'); }
+      else { btnPause.classList.remove('d-none'); btnResume.classList.add('d-none'); }
+      
+      if (stats.totalProgress >= 100 && stats.completed === stats.total) {
+        document.getElementById('dash-fill').classList.add('complete');
+        document.getElementById('dash-label').textContent = '✅ Complete!';
+        document.getElementById('btn-pause').classList.add('d-none');
+        document.getElementById('btn-resume').classList.add('d-none');
+        document.getElementById('btn-cancel-upload').classList.add('d-none');
+        document.getElementById('btn-submit').disabled = false;
+        document.getElementById('btn-submit').textContent = '✅ Submit Case';
+      }
+    }
+
+    document.getElementById('btn-pause').addEventListener('click', function() {
+      if (uploadManager) uploadManager.pause(); updateDashboard();
+    });
+    document.getElementById('btn-resume').addEventListener('click', function() {
+      if (uploadManager) uploadManager.resume(); updateDashboard();
+    });
+    document.getElementById('btn-cancel-upload').addEventListener('click', function() {
+      if (confirm('Cancel uploads? Uploaded files will be kept.')) {
+        if (uploadManager) uploadManager.cancel();
+        document.getElementById('upload-dashboard').classList.add('d-none');
+        document.getElementById('btn-submit').disabled = false;
+        document.getElementById('btn-submit').textContent = '📤 Submit Case';
+        uploadManager = null;
+      }
+    });
+
+    onNetworkChange(function(online) {
+      if (uploadManager) updateDashboard();
+      var cs = document.getElementById('connection-status');
+      if (!online && uploadManager && !uploadManager.paused) cs.classList.remove('d-none');
+      else cs.classList.add('d-none');
+    });
+
+    // ==========================================
+    // SUBMIT
+    // ==========================================
+    document.getElementById('btn-submit').addEventListener('click', async function() {
+      var btn = this;
+      var errorEl = document.getElementById('form-error');
+      var name = document.getElementById('case-name').value.trim();
+      var specialty = document.getElementById('specialty').value;
+      var total = unitPrice * quantity;
+      
+      if (uploadManager && uploadManager.getStats().totalProgress < 100) {
+        errorEl.textContent = 'Please wait for uploads to complete.'; errorEl.classList.add('visible'); return;
+      }
+      if (!name) { errorEl.textContent = 'Please enter a case name.'; errorEl.classList.add('visible'); return; }
+      if (!specialty) { errorEl.textContent = 'Please select a specialty.'; errorEl.classList.add('visible'); return; }
+      if (allFiles.length === 0) { errorEl.textContent = 'Please select at least one file.'; errorEl.classList.add('visible'); return; }
+      if (total > 0 && walletBalance < total) {
+        errorEl.textContent = 'Insufficient funds.'; errorEl.classList.add('visible'); return;
+      }
+      
+      errorEl.classList.remove('visible');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      
+      try {
+        if (!caseId) {
+          var result = await createCase({
+            lab_id: currentUser.id, name: name,
+            description: document.getElementById('description').value.trim() || null,
+            patient_name: document.getElementById('patient-name').value.trim() || null,
+            specialty: specialty,
+            due_date: document.getElementById('due-date').value || null,
+            is_urgent: document.getElementById('is-urgent').checked
+          });
+          if (result.error) throw new Error(result.error.message);
+          caseId = result.data.id;
+        }
+        
+        if (!uploadManager) {
+          showDashboard();
+          uploadManager = new UploadManager(caseId, 'source', {
+            onProgress: function() { updateDashboard(); },
+            onFileStart: function(f, i, t) { console.log('📤 ' + f.name); },
+            onFileComplete: function(n, r) { addCaseFile(caseId, r.path, r.name, r.size, 'source', currentUser.id); updateDashboard(); },
+            onFileError: function(n, e) { console.error('❌ ' + n, e.message); updateDashboard(); },
+            onComplete: function() { updateDashboard(); },
+            onPause: function() { updateDashboard(); },
+            onResume: function() { updateDashboard(); },
+            onSpeedUpdate: function() { updateDashboard(); }
+          });
+          uploadManager.addFiles(allFiles);
+          uploadManager.start();
+        }
+        
+        while (uploadManager && uploadManager.getStats().totalProgress < 100 && !uploadManager.cancelled) {
+          await sleep(1000);
+        }
+        if (uploadManager && uploadManager.cancelled) { btn.disabled = false; btn.textContent = '📤 Submit Case'; return; }
+        
+        document.getElementById('dash-label').textContent = '💰 Processing...';
+        var submitResult = await submitCaseRPC(caseId, currentUser.id);
+        if (submitResult.error) { document.getElementById('dash-fill').classList.add('error'); throw new Error(submitResult.error.message); }
+        
+        document.getElementById('dash-fill').classList.add('complete');
+        document.getElementById('dash-label').textContent = '✅ Done! Redirecting...';
+        setTimeout(function() { window.location.href = 'dashboard.html'; }, 1500);
+        
+      } catch (err) {
+        console.error(err);
+        errorEl.textContent = err.message; errorEl.classList.add('visible');
+        btn.disabled = false; btn.textContent = '📤 Submit Case';
+      }
+    });
+
+    document.getElementById('btn-cancel').addEventListener('click', function() {
+      if (confirm('Cancel? All changes lost.')) {
+        if (uploadManager) uploadManager.cancel();
+        window.location.href = 'dashboard.html';
+      }
+    });
+
+    window.toggleMenu = function() { document.getElementById('nav-links').classList.toggle('open'); };
+    document.addEventListener('click', function(e) { if (e.target.closest('.nav-links a')) document.getElementById('nav-links').classList.remove('open'); });
+
+    (async function() {
+      var user = await guardPage(['lab', 'admin']);
+      if (!user) return;
+      currentUser = user;
+      document.querySelectorAll('.user-name').forEach(function(el) { el.textContent = user.user_metadata.full_name || user.email; });
+      await loadPriceList();
+      await loadWallet();
+    })();
+  </script>
+</body>
+</html>

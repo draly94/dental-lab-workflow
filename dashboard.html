@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦷 Dashboard — Dental Workflow</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="brand">🦷 <span data-i18n="appName">Dental Workflow</span></a>
+      
+      <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      
+      <div class="nav-links" id="nav-links">
+        <a href="dashboard.html" class="active" data-i18n="dashboard">Dashboard</a>
+        <a href="case-new.html" data-i18n="newCase">New Case</a>
+                <a href="wallet.html">Wallet</a>
+
+        <button class="notification-bell" data-i18n-title="notifications" title="Notifications">
+          🔔
+          <span class="badge-dot has-unread"></span>
+        </button>
+      </div>
+      
+      <div class="user-menu">
+        <button class="btn-lang" id="lang-toggle" onclick="toggleLanguage()">عربي</button>
+        <span class="user-name">Demo Lab</span>
+        <button class="btn-logout" onclick="handleLogout()" data-i18n="logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="page-container">
+
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 data-i18n="myCases">My Cases</h1>
+      <a href="case-new.html" role="button" data-i18n="createNewCase">+ New Case</a>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+      <button class="filter-tab active" onclick="filterCases('all', this)" data-i18n="allCases">All</button>
+      <button class="filter-tab" onclick="filterCases('pending_conversion', this)" data-i18n="awaitingConversion">Awaiting Conversion</button>
+      <button class="filter-tab" onclick="filterCases('ready_for_assignment', this)" data-i18n="awaitingDesigner">Awaiting Designer</button>
+      <button class="filter-tab" onclick="filterCases('assigned', this)" data-i18n="assigned">Assigned</button>
+      <button class="filter-tab" onclick="filterCases('in_progress', this)" data-i18n="inProgress">In Progress</button>
+      <button class="filter-tab" onclick="filterCases('submitted', this)" data-i18n="submitted">Submitted</button>
+      <button class="filter-tab" onclick="filterCases('approved', this)" data-i18n="approved">Approved</button>
+      <input type="text" class="search-input" data-i18n-placeholder="searchCases" placeholder="Search cases..." oninput="searchCases(this.value)">
+    </div>
+
+    <!-- Case Grid -->
+    <div id="cases-grid" class="case-grid"></div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="empty-state d-none">
+      <div class="icon">📁</div>
+      <h3 data-i18n="noCasesFound">No cases found</h3>
+      <p data-i18n="noCasesMessage">Create your first case to get started.</p>
+      <a href="case-new.html" role="button" data-i18n="createNewCase">Create New Case</a>
+    </div>
+
+  </main>
+
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- App Scripts -->
+<script src="js/config.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/router.js"></script>
+  <script src="js/cases.js"></script>
+  <script src="js/files.js"></script>
+<script src="js/i18n.js"></script>
+  
+  
+<script>
+  // ==========================================
+  // Lab Dashboard — Real data from Supabase
+  // ==========================================
+
+  let currentFilter = 'all';
+  let currentSearch = '';
+  let allCases = [];
+  let currentUser = null;
+
+  function formatDate(dateStr) {
+    if (!dateStr) return t('notSet');
+    const d = new Date(dateStr);
+    const locale = currentLang === 'ar' ? 'ar-EG' : 'en-US';
+    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function renderCases(cases) {
+    const grid = document.getElementById('cases-grid');
+    const empty = document.getElementById('empty-state');
+
+    if (!cases || cases.length === 0) {
+      grid.innerHTML = '';
+      empty.classList.remove('d-none');
+      return;
+    }
+
+    empty.classList.add('d-none');
+    grid.innerHTML = cases.map(c => {
+      const designerName = c.designer ? c.designer.full_name : null;
+      return `
+        <a href="case-detail.html?id=${c.id}" class="case-card">
+          <div class="card-header">
+            <h3>${c.name}</h3>
+            <span class="badge ${c.status}${c.is_urgent ? ' urgent' : ''}">${t('status_' + c.status)}${c.is_urgent ? ' ⚡' : ''}</span>
+          </div>
+          <div class="card-meta">
+            <span>👤 ${c.patient_name || t('none')}</span>
+            <span>📋 ${t('spec_' + c.specialty)}</span>
+          </div>
+          <div class="card-footer">
+            <span>📅 ${t('due')}: ${c.due_date ? formatDate(c.due_date) : t('notSet')}</span>
+            <span>${designerName ? '👨‍🎨 ' + designerName : '🕐 ' + t('unassigned')}</span>
+          </div>
+        </a>
+      `;
+    }).join('');
+  }
+
+  function getFilteredCases() {
+    let filtered = allCases;
+    if (currentFilter !== 'all') {
+      filtered = filtered.filter(c => c.status === currentFilter);
+    }
+    if (currentSearch) {
+      const s = currentSearch.toLowerCase();
+      filtered = filtered.filter(c => 
+        c.name.toLowerCase().includes(s) ||
+        (c.patient_name && c.patient_name.toLowerCase().includes(s)) ||
+        (c.designer && c.designer.full_name && c.designer.full_name.toLowerCase().includes(s))
+      );
+    }
+    return filtered;
+  }
+
+  window.filterCases = function(status, btn) {
+    currentFilter = status;
+    document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    renderCases(getFilteredCases());
+  };
+
+  window.searchCases = function(query) {
+    currentSearch = query;
+    renderCases(getFilteredCases());
+  };
+
+  window.toggleMenu = function() {
+    document.getElementById('nav-links').classList.toggle('open');
+  };
+
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.nav-links a')) {
+      document.getElementById('nav-links').classList.remove('open');
+    }
+  });
+
+  window.rerenderPage = function() {
+    renderCases(getFilteredCases());
+  };
+
+  // ==========================================
+  // Load real cases from Supabase
+  // ==========================================
+  async function loadCases() {
+    console.log('📥 Loading cases from Supabase...');
+    
+    const cases = await getLabCases(currentUser.id);
+    console.log(`✅ Loaded ${cases.length} cases`);
+    
+    allCases = cases;
+    renderCases(getFilteredCases());
+  }
+
+  // ==========================================
+  // Auth guard — runs on page load
+  // ==========================================
+  (async function() {
+    const user = await guardPage(['lab', 'admin']);
+    if (!user) return;
+    
+    currentUser = user;
+    console.log('✅ Dashboard loaded for:', user.email);
+    
+    // Update navbar name
+    const nameEls = document.querySelectorAll('.user-name');
+    const userName = user.user_metadata?.full_name || user.email;
+    nameEls.forEach(el => el.textContent = userName);
+    
+    // Load real cases
+    await loadCases();
+  })();
+</script>
+</body>
+</html>

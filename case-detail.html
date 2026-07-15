@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦷 Case Detail — Dental Workflow</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .case-layout { display: grid; grid-template-columns: 1fr 400px; gap: 1.5rem; }
+    @media (max-width: 900px) { .case-layout { grid-template-columns: 1fr; } }
+    .file-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--color-light); border-radius: 6px; font-size: 0.85rem; }
+    .timer-box { background: var(--color-surface); border: 2px solid var(--color-warning); border-radius: var(--radius); padding: 1rem; text-align: center; margin-bottom: 0.5rem; }
+    .timer-box.expired { border-color: var(--color-danger); }
+    .timer-box .timer-value { font-size: 1.5rem; font-weight: 700; color: var(--color-warning); }
+    .timer-box.expired .timer-value { color: var(--color-danger); }
+    .feedback-bubble { padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    .feedback-bubble.lab { background: #dbeafe; border-left: 3px solid #2563eb; }
+    .feedback-bubble.designer { background: #d1fae5; border-left: 3px solid #16a34a; }
+    .feedback-bubble.admin { background: #fef3c7; border-left: 3px solid #f59e0b; }
+    .feedback-bubble .fb-header { font-size: 0.75rem; font-weight: 600; margin-bottom: 0.2rem; color: var(--color-muted); }
+    .step-card { padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    .step-card.info { background: #dbeafe; }
+    .step-card.success { background: #d1fae5; }
+    .step-card.warning { background: #fef3c7; }
+    .step-card.danger { background: #fecaca; }
+    .step-card.neutral { background: #f1f5f9; }
+    .rating-stars { font-size: 1.5rem; cursor: pointer; margin-bottom: 0.35rem; }
+    .rating-stars span { transition: color 0.15s; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="brand">🦷 Dental Workflow</a>
+      <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      <div class="nav-links" id="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="case-new.html">New Case</a>
+        <a href="wallet.html">Wallet</a>
+        <button class="notification-bell" onclick="window.location.href='notifications.html'" style="position:relative;">
+          🔔
+          <span class="badge-dot"></span>
+          <span class="notification-count" style="position:absolute; top:-4px; right:-4px; background:var(--color-danger); color:white; font-size:0.65rem; min-width:16px; height:16px; border-radius:10px; display:none; line-height:16px; text-align:center; padding:0 4px;"></span>
+        </button>
+      </div>
+      <div class="user-menu">
+        <button class="btn-lang" onclick="toggleLanguage()">عربي</button>
+        <span class="user-name">User</span>
+        <button class="btn-logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    
+    <a href="dashboard.html" style="font-size:0.9rem; color:var(--color-muted);">← Back</a>
+
+    <div class="page-header mt-1">
+      <div>
+        <h1 id="case-title">Loading...</h1>
+        <span id="status-badge" class="badge" style="font-size:0.85rem;"></span>
+        <span id="urgent-badge" class="badge urgent d-none">⚡ Urgent</span>
+      </div>
+    </div>
+
+    <div class="case-layout">
+
+      <!-- LEFT: Files + Timers + Feedback -->
+      <div>
+        
+        <!-- Timer -->
+        <div id="timer-section" class="d-none">
+          <div id="timer-box" class="timer-box">
+            <div style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem;" id="timer-label">Review Timer</div>
+            <div class="timer-value" id="timer-display">--:--:--</div>
+            <div style="font-size:0.8rem; color:var(--color-muted); margin-top:0.25rem;" id="timer-desc"></div>
+          </div>
+          <div id="timer-instruction" style="font-size:0.82rem; color:var(--color-muted); text-align:center; margin-top:0.25rem; padding:0.5rem; background:var(--color-light); border-radius:6px;"></div>
+        </div>
+
+        <!-- Source Files -->
+        <div style="margin-bottom:1.5rem;">
+          <h3 style="margin-bottom:0.5rem;">📁 Source Files <span id="source-count" style="font-size:0.85rem; color:var(--color-muted);">(0)</span></h3>
+          <div id="source-files-list" style="display:flex; flex-direction:column; gap:0.4rem;">
+            <p style="color:var(--color-muted); font-size:0.85rem;">No files yet.</p>
+          </div>
+          <button id="btn-download-source" class="secondary d-none mt-2" style="font-size:0.85rem;">📥 Download All Source Files</button>
+        </div>
+
+        <!-- Final Files -->
+        <div style="margin-bottom:1.5rem;">
+          <h3 style="margin-bottom:0.5rem;">📁 Final Files <span id="final-count" style="font-size:0.85rem; color:var(--color-muted);">(0)</span></h3>
+          <div id="final-files-list" style="display:flex; flex-direction:column; gap:0.4rem;">
+            <p style="color:var(--color-muted); font-size:0.85rem;">No files yet.</p>
+          </div>
+          <button id="btn-download-final" class="secondary d-none mt-2" style="font-size:0.85rem;">📥 Download All Final Files</button>
+        </div>
+
+        <!-- Upload Section (Designer) -->
+        <div id="upload-section" class="d-none" style="margin-bottom:1.5rem;">
+          <h3 style="margin-bottom:0.5rem;">📤 Upload Final Work</h3>
+          <input type="file" id="final-files-input" accept=".stl,.ply,.obj" multiple>
+          <small>Upload your completed STL files.</small>
+          <div id="final-upload-progress" class="upload-progress d-none mt-2">
+            <div class="progress-header">
+              <span class="progress-label">Uploading...</span>
+              <span class="progress-percent">0%</span>
+            </div>
+            <div class="progress-track"><div class="progress-fill" style="width:0%;"></div></div>
+            <div class="progress-footer"><span class="progress-details">Starting...</span></div>
+          </div>
+        </div>
+
+        <!-- Feedback -->
+        <div>
+          <h3 style="margin-bottom:0.5rem;">💬 Messages</h3>
+          <div id="feedback-list" style="margin-bottom:1rem;">
+            <p style="color:var(--color-muted); font-size:0.85rem;">No messages yet.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: Info + Actions -->
+      <div class="sidebar">
+        
+        <div class="info-card">
+          <h3>Case Information</h3>
+          <div class="info-row"><span class="info-label">Case ID</span><span id="info-id">—</span></div>
+          <div class="info-row"><span class="info-label">Patient</span><span id="info-patient">—</span></div>
+          <div class="info-row"><span class="info-label">Specialty</span><span id="info-specialty">—</span></div>
+          <div class="info-row"><span class="info-label">Lab</span><span id="info-lab">—</span></div>
+          <div class="info-row"><span class="info-label">Designer</span><span id="info-designer">Unassigned</span></div>
+          <div class="info-row"><span class="info-label">Due Date</span><span id="info-due">—</span></div>
+          <div class="info-row"><span class="info-label">Price</span><span id="info-price">—</span></div>
+          <div class="info-row"><span class="info-label">Designer Cut</span><span id="info-cut">—</span></div>
+        </div>
+
+        <div class="info-card" id="description-card" style="display:none;">
+          <h3>Description</h3>
+          <p id="info-description" style="font-size:0.9rem;"></p>
+        </div>
+
+        <div class="info-card">
+          <h3>Actions</h3>
+          <div class="action-buttons" id="action-buttons"></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/cases.js"></script>
+  <script src="js/files.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/i18n.js"></script>
+
+  <script>
+    var caseId = new URLSearchParams(window.location.search).get('id');
+    var caseData = null;
+    var currentUser = null;
+    var sourceFiles = [];
+    var finalFiles = [];
+    var timerInterval = null;
+    var selectedRating = 0;
+    var selectedLabRating = 0;
+
+    function formatDate(d) {
+      if (!d) return '—';
+      var locale = currentLang === 'ar' ? 'ar-EG' : 'en-US';
+      return new Date(d).toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    // ==========================================
+    // LOAD CASE
+    // ==========================================
+    async function loadCase() {
+      if (!caseId) { document.getElementById('case-title').textContent = 'No case ID'; return; }
+      caseData = await getCase(caseId);
+      if (!caseData) { document.getElementById('case-title').textContent = 'Case not found'; return; }
+      sourceFiles = await getCaseFilesFiltered(caseId, 'source');
+      finalFiles = await getCaseFilesFiltered(caseId, 'final');
+      var feedback = await getCaseFeedback(caseId);
+      var timer = await getCaseTimer(caseId);
+      renderCaseInfo();
+      renderFiles();
+      renderFeedback(feedback);
+      renderActions();
+      renderTimer(timer);
+    }
+
+    async function getCaseFilesFiltered(cid, type) {
+      var client = getSupabase();
+      if (!client) return [];
+      var r = await client.from('case_files').select('*').eq('case_id', cid).eq('upload_type', type).order('created_at', { ascending: true });
+      return r.data || [];
+    }
+
+    // ==========================================
+    // RENDER CASE INFO
+    // ==========================================
+    function renderCaseInfo() {
+      document.getElementById('case-title').textContent = caseData.name;
+      var badge = document.getElementById('status-badge');
+      badge.textContent = (t('status_' + caseData.status) || caseData.status);
+      badge.className = 'badge ' + caseData.status;
+      if (caseData.is_urgent) document.getElementById('urgent-badge').classList.remove('d-none');
+      
+      document.getElementById('info-id').textContent = '#' + (caseData.id ? caseData.id.slice(0, 8) : '—');
+      document.getElementById('info-patient').textContent = caseData.patient_name || '—';
+      document.getElementById('info-specialty').textContent = t('spec_' + caseData.specialty) || caseData.specialty;
+      document.getElementById('info-lab').textContent = caseData.lab ? caseData.lab.full_name : '—';
+      document.getElementById('info-due').textContent = formatDate(caseData.due_date);
+      document.getElementById('info-price').textContent = caseData.price ? '$' + parseFloat(caseData.price).toFixed(2) : '—';
+      document.getElementById('info-cut').textContent = caseData.designer_cut ? '$' + parseFloat(caseData.designer_cut).toFixed(2) : '—';
+      
+      var designerName = caseData.designer ? caseData.designer.full_name : 'Unassigned';
+      document.getElementById('info-designer').textContent = designerName;
+      
+      if (caseData.designer && caseData.designer_id) {
+        getUserProfile(caseData.designer_id).then(function(profile) {
+          if (profile && profile.avg_rating) {
+            var stars = '';
+            for (var i = 1; i <= 5; i++) {
+              stars += i <= Math.round(profile.avg_rating) ? '★' : '☆';
+            }
+            document.getElementById('info-designer').innerHTML = designerName + 
+              ' <span style="font-size:0.8rem; color:#f59e0b;">' + stars + ' ' + profile.avg_rating.toFixed(1) + '</span>';
+          }
+        });
+      }
+      
+      if (caseData.description) {
+        document.getElementById('description-card').style.display = 'block';
+        document.getElementById('info-description').textContent = caseData.description;
+      } else {
+        document.getElementById('description-card').style.display = 'none';
+      }
+    }
+
+    // ==========================================
+    // RENDER FILES
+    // ==========================================
+    function renderFiles() {
+      var srcList = document.getElementById('source-files-list');
+      var role = currentUser.user_metadata ? currentUser.user_metadata.role : 'lab';
+      var userId = currentUser.id;
+      var isDesigner = (role === 'designer' && caseData.designer_id === userId);
+      var isAdmin = (role === 'admin');
+      var canDownloadSource = false;
+      
+      if (isAdmin) { canDownloadSource = true; }
+      else if (isDesigner) { canDownloadSource = (caseData.status === 'review_in_progress' || caseData.status === 'in_progress' || caseData.status === 'revision_requested'); }
+      else { canDownloadSource = (role === 'lab' && caseData.lab_id === userId); }
+      
+      document.getElementById('source-count').textContent = '(' + sourceFiles.length + ')';
+      
+      if (sourceFiles.length === 0) {
+        srcList.innerHTML = '<p style="color:var(--color-muted); font-size:0.85rem;">No files yet.</p>';
+        document.getElementById('btn-download-source').classList.add('d-none');
+      } else {
+        srcList.innerHTML = sourceFiles.map(function(f) {
+          var downloadBtn = canDownloadSource ? 
+            '<button onclick="downloadSingle(\'' + f.file_path + '\', \'' + f.file_name + '\')" style="font-size:0.75rem; padding:0.2rem 0.5rem; border:1px solid var(--color-border); border-radius:4px; cursor:pointer; background:none;">📥</button>' :
+            '<span style="font-size:0.7rem; color:var(--color-muted);">🔒</span>';
+          return '<div class="file-item"><span>📎 ' + f.file_name + ' <span style="color:var(--color-muted);">(' + (f.file_size ? formatFileSize(f.file_size) : '—') + ')</span></span>' + downloadBtn + '</div>';
+        }).join('');
+        if (canDownloadSource) { document.getElementById('btn-download-source').classList.remove('d-none'); }
+        else { document.getElementById('btn-download-source').classList.add('d-none'); }
+      }
+      
+      var fnlList = document.getElementById('final-files-list');
+      var canDownloadFinal = (isAdmin || (role === 'lab' && caseData.lab_id === userId && caseData.status === 'approved'));
+      
+      document.getElementById('final-count').textContent = '(' + finalFiles.length + ')';
+      
+      if (finalFiles.length === 0) {
+        fnlList.innerHTML = '<p style="color:var(--color-muted); font-size:0.85rem;">No files yet.</p>';
+        document.getElementById('btn-download-final').classList.add('d-none');
+      } else {
+        fnlList.innerHTML = finalFiles.map(function(f) {
+          var downloadBtn = canDownloadFinal ?
+            '<button onclick="downloadSingle(\'' + f.file_path + '\', \'' + f.file_name + '\')" style="font-size:0.75rem; padding:0.2rem 0.5rem; border:1px solid var(--color-border); border-radius:4px; cursor:pointer; background:none;">📥</button>' :
+            '<span style="font-size:0.7rem; color:var(--color-muted);">🔒</span>';
+          return '<div class="file-item"><span>📎 ' + f.file_name + ' <span style="color:var(--color-muted);">(' + (f.file_size ? formatFileSize(f.file_size) : '—') + ')</span></span>' + downloadBtn + '</div>';
+        }).join('');
+        if (canDownloadFinal) { document.getElementById('btn-download-final').classList.remove('d-none'); }
+        else { document.getElementById('btn-download-final').classList.add('d-none'); }
+      }
+    }
+
+    window.downloadSingle = function(path, name) { downloadFile(path, name); };
+
+    document.getElementById('btn-download-source').addEventListener('click', function() {
+      sourceFiles.forEach(function(f, i) { setTimeout(function() { downloadFile(f.file_path, f.file_name); }, i * 500); });
+    });
+
+    document.getElementById('btn-download-final').addEventListener('click', function() {
+      finalFiles.forEach(function(f, i) { setTimeout(function() { downloadFile(f.file_path, f.file_name); }, i * 500); });
+    });
+
+    // ==========================================
+    // RENDER FEEDBACK
+    // ==========================================
+    function renderFeedback(messages) {
+      var container = document.getElementById('feedback-list');
+      if (!messages || messages.length === 0) {
+        container.innerHTML = '<p style="color:var(--color-muted); font-size:0.85rem;">No messages yet.</p>';
+        return;
+      }
+      container.innerHTML = messages.map(function(m) {
+        var role = m.sender ? m.sender.role : 'lab';
+        var name = m.sender ? m.sender.full_name : 'Unknown';
+        var cls = role === 'admin' ? 'admin' : (role === 'designer' ? 'designer' : 'lab');
+        return '<div class="feedback-bubble ' + cls + '"><div class="fb-header">' + name + ' • ' + formatDate(m.created_at) + '</div><div>' + m.message + '</div></div>';
+      }).join('');
+    }
+
+    // ==========================================
+    // RENDER TIMER
+    // ==========================================
+    function renderTimer(timer) {
+      var section = document.getElementById('timer-section');
+      var instruction = document.getElementById('timer-instruction');
+      if (!timer) { section.classList.add('d-none'); return; }
+      
+      var status = caseData.status;
+      var expiresAt, label, desc, instr;
+      
+      if ((status === 'assigned' || status === 'review_in_progress') && timer.review_expires_at && !timer.is_review_expired) {
+        expiresAt = new Date(timer.review_expires_at);
+        label = '⏱ Review Timer';
+        desc = 'Review period active. You can reject during this time.';
+        instr = '📋 <strong>Instructions:</strong> Review the source files. If you cannot do this case, click <strong>Reject</strong> before the timer ends. Click <strong>Accept</strong> to start work immediately.';
+      } else if ((status === 'in_progress' || status === 'revision_requested') && timer.work_expires_at && !timer.is_work_expired) {
+        expiresAt = new Date(timer.work_expires_at);
+        label = '⏱ Work Timer';
+        desc = 'Complete and upload your final work.';
+        instr = '🔧 <strong>Instructions:</strong> Download source STL files, complete the design, upload final STL files. Submit before the timer expires.';
+      } else { section.classList.add('d-none'); if (timerInterval) clearInterval(timerInterval); return; }
+      
+      section.classList.remove('d-none');
+      document.getElementById('timer-label').textContent = label;
+      document.getElementById('timer-desc').textContent = desc;
+      instruction.innerHTML = instr;
+      
+      var box = document.getElementById('timer-box');
+      box.classList.remove('expired');
+      
+      function updateTimerDisplay() {
+        var now2 = new Date();
+        var diff = expiresAt - now2;
+        if (diff <= 0) {
+          document.getElementById('timer-display').textContent = '00:00:00';
+          box.classList.add('expired');
+          instruction.innerHTML = '⏰ <strong>Timer expired!</strong> Reloading...';
+          if (timerInterval) clearInterval(timerInterval);
+          setTimeout(function() { loadCase(); }, 2000);
+          return;
+        }
+        var h = Math.floor(diff / 3600000);
+        var m = Math.floor((diff % 3600000) / 60000);
+        var s = Math.floor((diff % 60000) / 1000);
+        document.getElementById('timer-display').textContent = (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+      }
+      
+      updateTimerDisplay();
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimerDisplay, 1000);
+    }
+
+    // ==========================================
+    // RENDER ACTIONS
+    // ==========================================
+    function renderActions() {
+      var container = document.getElementById('action-buttons');
+      var status = caseData.status;
+      var role = currentUser.user_metadata ? currentUser.user_metadata.role : 'lab';
+      var userId = currentUser.id;
+      var buttons = '';
+      var uploadSection = document.getElementById('upload-section');
+      var downloadSourceBtn = document.getElementById('btn-download-source');
+      
+      uploadSection.classList.add('d-none');
+      downloadSourceBtn.classList.add('d-none');
+
+      // ==========================================
+      // DESIGNER
+      // ==========================================
+      if (role === 'designer' && caseData.designer_id === userId) {
+        
+        if (status === 'assigned') {
+          buttons += '<div class="step-card info"><strong>📋 Step 1: Review Case</strong><br>Click Start Review to begin the timer and access source files.</div>';
+          buttons += '<button class="btn-approve" onclick="designerStartReview()">▶ Start Review & Download Files</button>';
+          buttons += '<button class="btn-reject" onclick="designerReject()">✗ Reject Case</button>';
+        }
+        
+        if (status === 'review_in_progress') {
+          downloadSourceBtn.classList.remove('d-none');
+          buttons += '<div class="step-card info"><strong>📋 Review In Progress</strong><br>Review the source files. Accept to start work or reject before timer expires.</div>';
+          buttons += '<button class="btn-approve" onclick="designerAccept()">✅ Accept & Start Work</button>';
+          buttons += '<button class="btn-reject" onclick="designerReject()">✗ Reject Case</button>';
+          buttons += '<button class="btn-download" onclick="document.getElementById(\'btn-download-source\').click()">📥 Download Source Files</button>';
+        }
+        
+        if (status === 'in_progress' || status === 'revision_requested') {
+          downloadSourceBtn.classList.remove('d-none');
+          buttons += '<div class="step-card success"><strong>🔧 Step 2: Complete Work</strong><br>Download source files, complete the design, upload final STL files.</div>';
+          uploadSection.classList.remove('d-none');
+          buttons += '<button class="btn-download" onclick="document.getElementById(\'btn-download-source\').click()">📥 Download Source Files</button>';
+        }
+        
+        if (status === 'submitted') {
+          buttons += '<div class="step-card warning"><strong>⏳ Step 3: Admin Review</strong><br>Your work is submitted. Admin will review and approve it.</div>';
+        }
+        
+        if (status === 'approved') {
+          buttons += '<div class="step-card success"><strong>✅ Complete!</strong><br>Work approved and payment released to your wallet.</div>';
+          // Rate the lab
+          buttons += '<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">';
+          buttons += '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">⭐ Rate the Lab</div>';
+          buttons += '<div id="lab-rating-stars" class="rating-stars">';
+          for (var i = 1; i <= 5; i++) {
+            buttons += '<span onclick="setLabRating(' + i + ')" id="lab-star-' + i + '" style="color:#d1d5db;">★</span>';
+          }
+          buttons += '</div>';
+          buttons += '<textarea id="lab-rating-comment" placeholder="Leave a comment (optional)" rows="2" style="font-size:0.85rem;"></textarea>';
+          buttons += '<button class="secondary mt-1" onclick="submitLabRating()" style="font-size:0.8rem; width:100%;">Submit Rating</button>';
+          buttons += '<div id="lab-rating-msg" style="font-size:0.8rem; margin-top:0.25rem;"></div>';
+          buttons += '</div>';
+        }
+        
+        if (status === 'rejected_by_designer') {
+          buttons += '<div class="step-card danger"><strong>✗ Case Rejected</strong><br>You rejected this case. Waiting for admin action.</div>';
+        }
+      }
+
+      // ==========================================
+      // LAB
+      // ==========================================
+      if (role === 'lab' && caseData.lab_id === userId) {
+        if (status === 'pending_assignment') {
+          buttons += '<div class="step-card warning"><strong>⏳ Waiting for Assignment</strong><br>Admin will assign a designer soon.</div>';
+        }
+        if (status === 'assigned' || status === 'review_in_progress' || status === 'in_progress' || status === 'revision_requested') {
+          buttons += '<div class="step-card info"><strong>🔧 Designer Working</strong><br>The designer is working on your case.</div>';
+        }
+        if (status === 'submitted') {
+          buttons += '<div class="step-card warning"><strong>⏳ Admin Reviewing</strong><br>Admin is reviewing the final work.</div>';
+        }
+        if (status === 'approved') {
+          buttons += '<div class="step-card success"><strong>✅ Final Work Ready</strong><br>Download the final STL files and review on your device.</div>';
+          buttons += '<button class="btn-download" onclick="document.getElementById(\'btn-download-final\').click()">📥 Download Final Files</button>';
+          buttons += '<button class="btn-revision" onclick="labDispute()">⚠️ Report Issue</button>';
+          // Rate the designer
+          buttons += '<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">';
+          buttons += '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">⭐ Rate the Designer</div>';
+          buttons += '<div id="rating-stars" class="rating-stars">';
+          for (var i = 1; i <= 5; i++) {
+            buttons += '<span onclick="setRating(' + i + ')" id="star-' + i + '" style="color:#d1d5db;">★</span>';
+          }
+          buttons += '</div>';
+          buttons += '<textarea id="rating-comment" placeholder="Leave a comment (optional)" rows="2" style="font-size:0.85rem;"></textarea>';
+          buttons += '<button class="secondary mt-1" onclick="submitDesignerRating()" style="font-size:0.8rem; width:100%;">Submit Rating</button>';
+          buttons += '<div id="rating-msg" style="font-size:0.8rem; margin-top:0.25rem;"></div>';
+          buttons += '</div>';
+        }
+        if (status === 'in_dispute') {
+          buttons += '<div class="step-card danger"><strong>⚠️ Issue Reported</strong><br>Admin is reviewing your feedback.</div>';
+        }
+        if (status === 'modification_requested') {
+          buttons += '<div class="step-card warning"><strong>📝 Modification Requested</strong><br>Admin requested changes. Check messages.</div>';
+        }
+      }
+
+      // ==========================================
+      // ADMIN
+      // ==========================================
+      if (role === 'admin') {
+        buttons += '<button class="secondary w-100" onclick="document.getElementById(\'btn-download-source\').click()">📥 Download Source Files</button>';
+        if (status === 'pending_assignment') {
+          buttons += '<div class="step-card warning"><strong>📋 Needs Assignment</strong><br>Assign a designer from the admin panel.</div>';
+          buttons += '<button class="btn-approve" onclick="window.location.href=\'admin.html\'">Go to Admin Panel</button>';
+        }
+        if (status === 'submitted') {
+          buttons += '<div class="step-card warning"><strong>📋 Review Final Work</strong><br>Download final files and review. Approve or return to designer.</div>';
+          buttons += '<button class="btn-approve" onclick="adminApprove()">✅ Approve Final Work</button>';
+          buttons += '<button class="btn-reject" onclick="adminRejectFinal()">✗ Return to Designer</button>';
+        }
+        if (status === 'rejected_by_designer') {
+          buttons += '<button class="btn-approve" onclick="adminReassign()">🔄 Reassign Designer</button>';
+          buttons += '<button class="btn-revision" onclick="adminRequestMod()">📝 Request Lab Modification</button>';
+        }
+        if (status === 'in_dispute') {
+          buttons += '<div class="step-card danger"><strong>⚠️ Dispute</strong><br>Lab reported an issue. Choose resolution:</div>';
+          buttons += '<button class="btn-approve" onclick="adminResolveDispute(\'return_designer\')">🔄 Return to Designer</button>';
+          buttons += '<button class="btn-revision" onclick="adminResolveDispute(\'request_lab_modification\')">📝 Request Lab Modification</button>';
+          buttons += '<button class="btn-approve" onclick="adminResolveDispute(\'mark_approved\')">✅ Resolve as Approved</button>';
+          buttons += '<button class="btn-reject" onclick="adminResolveDispute(\'cancel\')">✗ Cancel Case</button>';
+        }
+      }
+
+      if (status === 'cancelled') {
+        buttons += '<div class="step-card neutral"><strong>🚫 Cancelled</strong><br>This case has been cancelled.</div>';
+      }
+
+      container.innerHTML = buttons || '<p style="font-size:0.85rem; color:var(--color-muted);">No actions available</p>';
+    }
+
+    // ==========================================
+    // DESIGNER ACTIONS
+    // ==========================================
+    window.designerStartReview = async function() {
+      if (!confirm('Start review? Timer begins (' + (caseData.review_hours || 1) + ' hour(s)). You can still reject.')) return;
+      var r = await designerStartReviewRPC(caseId, currentUser.id);
+      if (r.error) { alert(r.error.message); return; }
+      await loadCase();
+    };
+
+    window.designerAccept = async function() {
+      if (!confirm('Accept case? Work timer starts now.')) return;
+      var r = await designerAcceptCaseRPC(caseId, currentUser.id);
+      if (r.error) { alert(r.error.message); return; }
+      await loadCase();
+    };
+
+    window.designerReject = function() {
+      var reason = prompt('Why are you rejecting this case?');
+      if (!reason) return;
+      updateCaseWithFeedback('rejected_by_designer', reason, 'designer_rejection');
+    };
+
+    document.getElementById('final-files-input').addEventListener('change', async function(e) {
+      var files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      var progressDiv = document.getElementById('final-upload-progress');
+      progressDiv.classList.remove('d-none');
+      var manager = new UploadManager(caseId, 'final', {
+        onProgress: function(p, l, t) {
+          var fill = progressDiv.querySelector('.progress-fill');
+          var pct = progressDiv.querySelector('.progress-percent');
+          var det = progressDiv.querySelector('.progress-details');
+          fill.style.width = p + '%'; pct.textContent = p + '%';
+          det.textContent = formatFileSize(l) + ' / ' + formatFileSize(t);
+          if (p >= 100) fill.classList.add('complete');
+        },
+        onFileComplete: function(name, result) { addCaseFile(caseId, result.path, result.name, result.size, 'final', currentUser.id); }
+      });
+      manager.addFiles(files);
+      manager.onComplete = async function() {
+        var client = getSupabase();
+        await client.from('cases').update({ status: 'submitted', updated_at: new Date().toISOString() }).eq('id', caseId);
+        var adminId = await getAdminId();
+        if (adminId) await client.rpc('create_notification', { p_user_id: adminId, p_case_id: caseId, p_type: 'final_submitted', p_title: 'Final Work Submitted', p_message: 'Designer submitted final work' });
+        await loadCase();
+      };
+      manager.start();
+    });
+
+    async function updateCaseWithFeedback(newStatus, message, feedbackType) {
+      var client = getSupabase();
+      if (message) await client.from('case_feedback').insert({ case_id: caseId, sender_id: currentUser.id, feedback_type: feedbackType || 'admin_response', message: message });
+      await client.from('cases').update({ status: newStatus, designer_feedback: message, updated_at: new Date().toISOString() }).eq('id', caseId);
+      var adminId = await getAdminId();
+      if (adminId) await client.rpc('create_notification', { p_user_id: adminId, p_case_id: caseId, p_type: 'status_change', p_title: 'Status: ' + newStatus, p_message: message || '' });
+      await loadCase();
+    }
+
+    // ==========================================
+    // LAB ACTIONS
+    // ==========================================
+    window.labDispute = async function() {
+      var feedback = prompt('Describe the issue:');
+      if (!feedback) return;
+      await disputeCaseRPC(caseId, currentUser.id, feedback);
+      await loadCase();
+    };
+
+    // ==========================================
+    // ADMIN ACTIONS
+    // ==========================================
+    window.adminApprove = async function() {
+      if (!confirm('Approve? Designer gets paid.')) return;
+      var r = await approveCaseRPC(caseId, currentUser.id);
+      if (r.error) { alert(r.error.message); return; }
+      await loadCase();
+    };
+    window.adminRejectFinal = async function() {
+      var reason = prompt('Reason for returning to designer:');
+      if (!reason) return;
+      await updateCaseWithFeedback('revision_requested', reason, 'admin_response');
+    };
+    window.adminReassign = function() { window.location.href = 'admin.html'; };
+    window.adminRequestMod = async function() {
+      var notes = prompt('Modification notes for lab:');
+      if (!notes) return;
+      await resolveDisputeRPC(caseId, currentUser.id, 'request_lab_modification', notes);
+      await loadCase();
+    };
+    window.adminResolveDispute = async function(resolution) {
+      var notes = resolution === 'cancel' ? prompt('Reason for cancellation:') : '';
+      await resolveDisputeRPC(caseId, currentUser.id, resolution, notes || null);
+      await loadCase();
+    };
+    async function getAdminId() {
+      var client = getSupabase();
+      var r = await client.from('profiles').select('id').eq('role', 'admin').limit(1).single();
+      return r.data ? r.data.id : null;
+    }
+
+    // ==========================================
+    // RATING SYSTEM
+    // ==========================================
+    window.setRating = function(rating) {
+      selectedRating = rating;
+      for (var i = 1; i <= 5; i++) {
+        var star = document.getElementById('star-' + i);
+        if (star) star.style.color = i <= rating ? '#f59e0b' : '#d1d5db';
+      }
+    };
+
+    window.submitDesignerRating = async function() {
+      if (selectedRating === 0) {
+        document.getElementById('rating-msg').textContent = 'Please select a rating.';
+        document.getElementById('rating-msg').style.color = 'var(--color-danger)';
+        return;
+      }
+      var comment = document.getElementById('rating-comment').value.trim();
+      if (!caseData.designer_id) { document.getElementById('rating-msg').textContent = 'No designer assigned.'; return; }
+      var result = await submitRating(caseId, currentUser.id, caseData.designer_id, selectedRating, comment || null);
+      if (result.error) {
+        document.getElementById('rating-msg').textContent = 'Error: ' + result.error.message;
+        document.getElementById('rating-msg').style.color = 'var(--color-danger)';
+        return;
+      }
+      document.getElementById('rating-msg').textContent = '✅ Rating submitted!';
+      document.getElementById('rating-msg').style.color = 'var(--color-success)';
+      for (var i = 1; i <= 5; i++) { var star = document.getElementById('star-' + i); if (star) star.style.cursor = 'default'; }
+      document.getElementById('rating-comment').disabled = true;
+    };
+
+    window.setLabRating = function(rating) {
+      selectedLabRating = rating;
+      for (var i = 1; i <= 5; i++) {
+        var star = document.getElementById('lab-star-' + i);
+        if (star) star.style.color = i <= rating ? '#f59e0b' : '#d1d5db';
+      }
+    };
+
+    window.submitLabRating = async function() {
+      if (selectedLabRating === 0) {
+        document.getElementById('lab-rating-msg').textContent = 'Please select a rating.';
+        document.getElementById('lab-rating-msg').style.color = 'var(--color-danger)';
+        return;
+      }
+      var comment = document.getElementById('lab-rating-comment').value.trim();
+      var result = await submitRating(caseId, currentUser.id, caseData.lab_id, selectedLabRating, comment || null);
+      if (result.error) {
+        document.getElementById('lab-rating-msg').textContent = 'Error: ' + result.error.message;
+        document.getElementById('lab-rating-msg').style.color = 'var(--color-danger)';
+        return;
+      }
+      document.getElementById('lab-rating-msg').textContent = '✅ Rating submitted!';
+      document.getElementById('lab-rating-msg').style.color = 'var(--color-success)';
+      for (var i = 1; i <= 5; i++) { var star = document.getElementById('lab-star-' + i); if (star) star.style.cursor = 'default'; }
+      document.getElementById('lab-rating-comment').disabled = true;
+    };
+
+    // ==========================================
+    // MISC
+    // ==========================================
+    window.toggleMenu = function() { document.getElementById('nav-links').classList.toggle('open'); };
+    document.addEventListener('click', function(e) { if (e.target.closest('.nav-links a')) document.getElementById('nav-links').classList.remove('open'); });
+    window.rerenderPage = function() { if (caseData) renderCaseInfo(); };
+
+    (async function() {
+      var user = await guardPage(['lab', 'designer', 'admin']);
+      if (!user) return;
+      currentUser = user;
+      document.querySelectorAll('.user-name').forEach(function(el) { el.textContent = user.user_metadata.full_name || user.email; });
+      await updateNotificationBadge();
+      subscribeToNotifications(user.id, function() { updateNotificationBadge(); });
+      await loadCase();
+    })();
+  </script>
+</body>
+</html>

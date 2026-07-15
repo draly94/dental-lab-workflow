@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🦷 Wallet — Dental Workflow</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .wallet-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    @media (max-width: 768px) { .wallet-layout { grid-template-columns: 1fr; } }
+    .balance-card {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      border-radius: var(--radius);
+      padding: 2rem;
+      text-align: center;
+    }
+    .balance-card .balance-amount { font-size: 2.5rem; font-weight: 700; margin: 0.5rem 0; }
+    .balance-card .balance-label { font-size: 0.9rem; opacity: 0.85; }
+    .top-up-form {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+    .tx-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--color-light);
+      font-size: 0.85rem;
+    }
+    .tx-row .tx-amount.positive { color: var(--color-success); font-weight: 600; }
+    .tx-row .tx-amount.negative { color: var(--color-danger); font-weight: 600; }
+    .quick-amounts { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .quick-amounts button {
+      padding: 0.4rem 0.85rem;
+      border: 1px solid var(--color-border);
+      border-radius: 20px;
+      background: var(--color-surface);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .quick-amounts button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="container">
+      <a href="dashboard.html" class="brand">🦷 Dental Workflow</a>
+      <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">☰</button>
+      <div class="nav-links" id="nav-links">
+        <a href="dashboard.html">Dashboard</a>
+        <a href="case-new.html">New Case</a>
+        <a href="wallet.html" class="active">Wallet</a>
+      </div>
+      <div class="user-menu">
+        <button class="btn-lang" onclick="toggleLanguage()">عربي</button>
+        <span class="user-name">User</span>
+        <button class="btn-logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="page-container">
+    <div class="page-header">
+      <h1>💰 Wallet</h1>
+    </div>
+
+    <div class="wallet-layout">
+      
+      <!-- LEFT: Balance + Top-up -->
+      <div>
+        <div class="balance-card">
+          <div class="balance-label">Current Balance</div>
+          <div class="balance-amount" id="balance-display">$0.00</div>
+          <div style="display:flex; gap:1.5rem; justify-content:center; margin-top:1rem; font-size:0.85rem;">
+            <div><span style="opacity:0.7;">Earned</span><br><span id="earned-display">$0.00</span></div>
+            <div><span style="opacity:0.7;">Spent</span><br><span id="spent-display">$0.00</span></div>
+          </div>
+        </div>
+
+        <!-- Top-up (Lab only) -->
+        <div id="topup-section" class="top-up-form mt-2 d-none">
+          <h3 style="margin-bottom:0.75rem;">Add Funds</h3>
+          <div class="quick-amounts">
+            <button onclick="setTopupAmount(50)">$50</button>
+            <button onclick="setTopupAmount(100)">$100</button>
+            <button onclick="setTopupAmount(200)">$200</button>
+            <button onclick="setTopupAmount(500)">$500</button>
+          </div>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="number" id="topup-amount" placeholder="Custom amount" min="1" step="0.01" style="flex:1;">
+            <button id="btn-topup" onclick="doTopup()">Top Up</button>
+          </div>
+          <small style="color:var(--color-muted);">This is a simulated payment. Real payment gateway coming soon.</small>
+        </div>
+
+        <!-- Withdraw (Designer only) -->
+        <div id="withdraw-section" class="top-up-form mt-2 d-none">
+          <h3 style="margin-bottom:0.75rem;">Request Withdrawal</h3>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="number" id="withdraw-amount" placeholder="Amount" min="1" step="0.01" style="flex:1;">
+            <button id="btn-withdraw" onclick="doWithdraw()">Request</button>
+          </div>
+          <small style="color:var(--color-muted);">Minimum withdrawal: $50. Admin will process within 24 hours.</small>
+          <div id="withdraw-error" class="error-message mt-2"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Transactions -->
+      <div>
+        <h3 style="margin-bottom:0.75rem;">📊 Transaction History</h3>
+        <div id="tx-list" style="max-height:400px; overflow-y:auto;">
+          <p style="color:var(--color-muted); font-size:0.85rem;">Loading...</p>
+        </div>
+
+        <!-- Withdrawal History (Designer) -->
+        <div id="withdrawal-history" class="mt-3 d-none">
+          <h3 style="margin-bottom:0.75rem;">📤 Withdrawal Requests</h3>
+          <div id="wd-list" style="max-height:200px; overflow-y:auto;"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/cases.js"></script>
+  <script src="js/files.js"></script>
+  <script src="js/wallet.js"></script>
+  <script src="js/i18n.js"></script>
+
+  <script>
+    var currentUser = null;
+    var userRole = null;
+    var walletData = null;
+
+    async function loadWallet() {
+      walletData = await getWalletBalance(currentUser.id);
+      document.getElementById('balance-display').textContent = '$' + (walletData.balance || 0).toFixed(2);
+      document.getElementById('earned-display').textContent = '$' + (walletData.total_earned || 0).toFixed(2);
+      document.getElementById('spent-display').textContent = '$' + (walletData.total_spent || 0).toFixed(2);
+    }
+
+    async function loadTransactions() {
+      var txs = await getTransactions(currentUser.id, 30);
+      var container = document.getElementById('tx-list');
+      
+      if (txs.length === 0) {
+        container.innerHTML = '<p style="color:var(--color-muted); font-size:0.85rem;">No transactions yet.</p>';
+        return;
+      }
+
+      container.innerHTML = txs.map(function(tx) {
+        var isPositive = (tx.type === 'deposit' || tx.type === 'designer_earning');
+        var cls = isPositive ? 'positive' : 'negative';
+        var sign = isPositive ? '+' : '-';
+        var icon = tx.type === 'deposit' ? '💳' : 
+                   tx.type === 'case_payment' ? '📤' :
+                   tx.type === 'designer_earning' ? '💰' :
+                   tx.type === 'withdrawal' ? '🏦' : '💸';
+        
+        return '<div class="tx-row">' +
+          '<span>' + icon + ' <strong>' + tx.description + '</strong><br><small style="color:var(--color-muted);">' + formatDate(tx.created_at) + '</small></span>' +
+          '<span class="tx-amount ' + cls + '">' + sign + '$' + parseFloat(tx.amount).toFixed(2) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function loadWithdrawalHistory() {
+      if (userRole !== 'designer') return;
+      
+      var wds = await getWithdrawalHistory(currentUser.id);
+      var container = document.getElementById('wd-list');
+      var section = document.getElementById('withdrawal-history');
+      
+      section.classList.remove('d-none');
+      
+      if (wds.length === 0) {
+        container.innerHTML = '<p style="color:var(--color-muted); font-size:0.85rem;">No withdrawal requests.</p>';
+        return;
+      }
+
+      container.innerHTML = wds.map(function(w) {
+        var statusColor = w.status === 'paid' ? 'var(--color-success)' : 
+                          w.status === 'rejected' ? 'var(--color-danger)' : 'var(--color-warning)';
+        return '<div class="tx-row">' +
+          '<span><strong>$' + parseFloat(w.amount).toFixed(2) + '</strong><br><small style="color:' + statusColor + ';">' + w.status + '</small></span>' +
+          '<span style="font-size:0.8rem; color:var(--color-muted);">' + formatDate(w.created_at) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    window.setTopupAmount = function(amount) {
+      document.getElementById('topup-amount').value = amount;
+    };
+
+    window.doTopup = async function() {
+      var amount = parseFloat(document.getElementById('topup-amount').value);
+      if (!amount || amount <= 0) { alert('Please enter a valid amount.'); return; }
+      if (!confirm('Add $' + amount.toFixed(2) + ' to your wallet? (Simulated payment)')) return;
+      
+      var btn = document.getElementById('btn-topup');
+      btn.disabled = true;
+      btn.textContent = 'Processing...';
+      
+      var r = await topUpWallet(currentUser.id, amount);
+      if (r.error) { alert('Error: ' + r.error.message); btn.disabled = false; btn.textContent = 'Top Up'; return; }
+      
+      btn.disabled = false;
+      btn.textContent = 'Top Up';
+      document.getElementById('topup-amount').value = '';
+      
+      await loadWallet();
+      await loadTransactions();
+      alert('✅ Wallet topped up successfully!');
+    };
+
+    window.doWithdraw = async function() {
+      var amount = parseFloat(document.getElementById('withdraw-amount').value);
+      var errorEl = document.getElementById('withdraw-error');
+      errorEl.classList.remove('visible');
+      
+      if (!amount || amount <= 0) {
+        errorEl.textContent = 'Please enter a valid amount.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      
+      if (amount < 50) {
+        errorEl.textContent = 'Minimum withdrawal is $50.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      
+      if (amount > (walletData.balance || 0)) {
+        errorEl.textContent = 'Insufficient balance.';
+        errorEl.classList.add('visible');
+        return;
+      }
+      
+      if (!confirm('Request withdrawal of $' + amount.toFixed(2) + '? Admin will process it.')) return;
+      
+      var btn = document.getElementById('btn-withdraw');
+      btn.disabled = true;
+      btn.textContent = 'Requesting...';
+      
+      var r = await requestWithdrawal(currentUser.id, amount);
+      if (r.error) { alert('Error: ' + r.error.message); btn.disabled = false; btn.textContent = 'Request'; return; }
+      
+      btn.disabled = false;
+      btn.textContent = 'Request';
+      document.getElementById('withdraw-amount').value = '';
+      
+      await loadWithdrawalHistory();
+      alert('✅ Withdrawal requested! Admin will process it.');
+    };
+
+    function formatDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    window.toggleMenu = function() { document.getElementById('nav-links').classList.toggle('open'); };
+    document.addEventListener('click', function(e) { if (e.target.closest('.nav-links a')) document.getElementById('nav-links').classList.remove('open'); });
+
+    (async function() {
+      var user = await guardPage(['lab', 'designer', 'admin']);
+      if (!user) return;
+      currentUser = user;
+      userRole = user.user_metadata ? user.user_metadata.role : 'lab';
+      
+      document.querySelectorAll('.user-name').forEach(function(el) { 
+        el.textContent = user.user_metadata.full_name || user.email; 
+      });
+      
+      // Show correct sections based on role
+      if (userRole === 'lab') {
+        document.getElementById('topup-section').classList.remove('d-none');
+      } else if (userRole === 'designer') {
+        document.getElementById('withdraw-section').classList.remove('d-none');
+      }
+      
+      await loadWallet();
+      await loadTransactions();
+      await loadWithdrawalHistory();
+    })();
+  </script>
+</body>
+</html>
