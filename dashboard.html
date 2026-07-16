@@ -21,10 +21,11 @@
         <a href="case-new.html" data-i18n="newCase">New Case</a>
                 <a href="wallet.html">Wallet</a>
 
-        <button class="notification-bell" data-i18n-title="notifications" title="Notifications">
-          🔔
-          <span class="badge-dot has-unread"></span>
-        </button>
+<button class="notification-bell" onclick="window.location.href='notifications.html'" style="position:relative;">
+  🔔
+  <span class="badge-dot"></span>
+  <span class="notification-count" style="position:absolute; top:-4px; right:-4px; background:var(--color-danger); color:white; font-size:0.65rem; min-width:16px; height:16px; border-radius:10px; display:none; line-height:16px; text-align:center; padding:0 4px;"></span>
+</button>
       </div>
       
       <div class="user-menu">
@@ -203,6 +204,14 @@
     
     // Load real cases
     await loadCases();
+  })();
+</script>
+  <script src="js/notifications.js"></script>
+<script>
+  (async function() {
+    await updateNotificationBadge();
+    var user = await getCurrentUser();
+    if (user) subscribeToNotifications(user.id, function() { updateNotificationBadge(); });
   })();
 </script>
 </body>

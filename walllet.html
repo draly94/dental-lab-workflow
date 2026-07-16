@@ -53,8 +53,12 @@
       <button class="hamburger" onclick="toggleMenu()" aria-label="Menu">☰</button>
       <div class="nav-links" id="nav-links">
         <a href="dashboard.html">Dashboard</a>
-        <a href="case-new.html">New Case</a>
         <a href="wallet.html" class="active">Wallet</a>
+        <button class="notification-bell" onclick="window.location.href='notifications.html'" style="position:relative;">
+  🔔
+  <span class="badge-dot"></span>
+  <span class="notification-count" style="position:absolute; top:-4px; right:-4px; background:var(--color-danger); color:white; font-size:0.65rem; min-width:16px; height:16px; border-radius:10px; display:none; line-height:16px; text-align:center; padding:0 4px;"></span>
+</button>
       </div>
       <div class="user-menu">
         <button class="btn-lang" onclick="toggleLanguage()">عربي</button>
@@ -293,5 +297,13 @@
       await loadWithdrawalHistory();
     })();
   </script>
+  <script src="js/notifications.js"></script>
+<script>
+  (async function() {
+    await updateNotificationBadge();
+    var user = await getCurrentUser();
+    if (user) subscribeToNotifications(user.id, function() { updateNotificationBadge(); });
+  })();
+</script>
 </body>
 </html>

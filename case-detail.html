@@ -25,8 +25,10 @@
     .step-card.warning { background: #fef3c7; }
     .step-card.danger { background: #fecaca; }
     .step-card.neutral { background: #f1f5f9; }
-    .rating-stars { font-size: 1.5rem; cursor: pointer; margin-bottom: 0.35rem; }
+    .rating-stars { font-size: 1.5rem; cursor: pointer; margin-bottom: 0.35rem; display: inline-block; }
     .rating-stars span { transition: color 0.15s; }
+    .rating-display { font-size: 1.1rem; margin-bottom: 0.25rem; }
+    .rating-display span { color: #f59e0b; }
   </style>
 </head>
 <body>
@@ -194,6 +196,7 @@
       renderFeedback(feedback);
       renderActions();
       renderTimer(timer);
+      renderRatingUI();
     }
 
     async function getCaseFilesFiltered(cid, type) {
@@ -221,21 +224,39 @@
       document.getElementById('info-price').textContent = caseData.price ? '$' + parseFloat(caseData.price).toFixed(2) : '—';
       document.getElementById('info-cut').textContent = caseData.designer_cut ? '$' + parseFloat(caseData.designer_cut).toFixed(2) : '—';
       
-      var designerName = caseData.designer ? caseData.designer.full_name : 'Unassigned';
-      document.getElementById('info-designer').textContent = designerName;
-      
-      if (caseData.designer && caseData.designer_id) {
-        getUserProfile(caseData.designer_id).then(function(profile) {
-          if (profile && profile.avg_rating) {
-            var stars = '';
-            for (var i = 1; i <= 5; i++) {
-              stars += i <= Math.round(profile.avg_rating) ? '★' : '☆';
-            }
-            document.getElementById('info-designer').innerHTML = designerName + 
-              ' <span style="font-size:0.8rem; color:#f59e0b;">' + stars + ' ' + profile.avg_rating.toFixed(1) + '</span>';
-          }
-        });
+// Designer name + rating
+var designerName = caseData.designer ? caseData.designer.full_name : 'Unassigned';
+document.getElementById('info-designer').textContent = designerName;
+
+if (caseData.designer && caseData.designer_id) {
+  getUserProfile(caseData.designer_id).then(function(profile) {
+    if (profile && profile.avg_rating && profile.total_ratings > 0) {
+      var stars = '';
+      for (var i = 1; i <= 5; i++) {
+        stars += i <= Math.round(profile.avg_rating) ? '★' : '☆';
       }
+      document.getElementById('info-designer').innerHTML = designerName + 
+        ' <span style="font-size:0.75rem; color:#f59e0b;">' + stars + ' ' + profile.avg_rating.toFixed(1) + ' (' + profile.total_ratings + ')</span>';
+    }
+  });
+}
+
+// Lab name + rating
+var labName = caseData.lab ? caseData.lab.full_name : '—';
+document.getElementById('info-lab').textContent = labName;
+
+if (caseData.lab_id) {
+  getUserProfile(caseData.lab_id).then(function(profile) {
+    if (profile && profile.avg_rating && profile.total_ratings > 0) {
+      var stars = '';
+      for (var i = 1; i <= 5; i++) {
+        stars += i <= Math.round(profile.avg_rating) ? '★' : '☆';
+      }
+      document.getElementById('info-lab').innerHTML = labName + 
+        ' <span style="font-size:0.75rem; color:#f59e0b;">' + stars + ' ' + profile.avg_rating.toFixed(1) + ' (' + profile.total_ratings + ')</span>';
+    }
+  });
+}
       
       if (caseData.description) {
         document.getElementById('description-card').style.display = 'block';
@@ -395,13 +416,11 @@
       // DESIGNER
       // ==========================================
       if (role === 'designer' && caseData.designer_id === userId) {
-        
         if (status === 'assigned') {
           buttons += '<div class="step-card info"><strong>📋 Step 1: Review Case</strong><br>Click Start Review to begin the timer and access source files.</div>';
           buttons += '<button class="btn-approve" onclick="designerStartReview()">▶ Start Review & Download Files</button>';
           buttons += '<button class="btn-reject" onclick="designerReject()">✗ Reject Case</button>';
         }
-        
         if (status === 'review_in_progress') {
           downloadSourceBtn.classList.remove('d-none');
           buttons += '<div class="step-card info"><strong>📋 Review In Progress</strong><br>Review the source files. Accept to start work or reject before timer expires.</div>';
@@ -409,34 +428,19 @@
           buttons += '<button class="btn-reject" onclick="designerReject()">✗ Reject Case</button>';
           buttons += '<button class="btn-download" onclick="document.getElementById(\'btn-download-source\').click()">📥 Download Source Files</button>';
         }
-        
         if (status === 'in_progress' || status === 'revision_requested') {
           downloadSourceBtn.classList.remove('d-none');
           buttons += '<div class="step-card success"><strong>🔧 Step 2: Complete Work</strong><br>Download source files, complete the design, upload final STL files.</div>';
           uploadSection.classList.remove('d-none');
           buttons += '<button class="btn-download" onclick="document.getElementById(\'btn-download-source\').click()">📥 Download Source Files</button>';
         }
-        
         if (status === 'submitted') {
           buttons += '<div class="step-card warning"><strong>⏳ Step 3: Admin Review</strong><br>Your work is submitted. Admin will review and approve it.</div>';
         }
-        
         if (status === 'approved') {
           buttons += '<div class="step-card success"><strong>✅ Complete!</strong><br>Work approved and payment released to your wallet.</div>';
-          // Rate the lab
-          buttons += '<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">';
-          buttons += '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">⭐ Rate the Lab</div>';
-          buttons += '<div id="lab-rating-stars" class="rating-stars">';
-          for (var i = 1; i <= 5; i++) {
-            buttons += '<span onclick="setLabRating(' + i + ')" id="lab-star-' + i + '" style="color:#d1d5db;">★</span>';
-          }
-          buttons += '</div>';
-          buttons += '<textarea id="lab-rating-comment" placeholder="Leave a comment (optional)" rows="2" style="font-size:0.85rem;"></textarea>';
-          buttons += '<button class="secondary mt-1" onclick="submitLabRating()" style="font-size:0.8rem; width:100%;">Submit Rating</button>';
-          buttons += '<div id="lab-rating-msg" style="font-size:0.8rem; margin-top:0.25rem;"></div>';
-          buttons += '</div>';
+          buttons += '<div id="designer-rating-section" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);"></div>';
         }
-        
         if (status === 'rejected_by_designer') {
           buttons += '<div class="step-card danger"><strong>✗ Case Rejected</strong><br>You rejected this case. Waiting for admin action.</div>';
         }
@@ -459,18 +463,7 @@
           buttons += '<div class="step-card success"><strong>✅ Final Work Ready</strong><br>Download the final STL files and review on your device.</div>';
           buttons += '<button class="btn-download" onclick="document.getElementById(\'btn-download-final\').click()">📥 Download Final Files</button>';
           buttons += '<button class="btn-revision" onclick="labDispute()">⚠️ Report Issue</button>';
-          // Rate the designer
-          buttons += '<div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">';
-          buttons += '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">⭐ Rate the Designer</div>';
-          buttons += '<div id="rating-stars" class="rating-stars">';
-          for (var i = 1; i <= 5; i++) {
-            buttons += '<span onclick="setRating(' + i + ')" id="star-' + i + '" style="color:#d1d5db;">★</span>';
-          }
-          buttons += '</div>';
-          buttons += '<textarea id="rating-comment" placeholder="Leave a comment (optional)" rows="2" style="font-size:0.85rem;"></textarea>';
-          buttons += '<button class="secondary mt-1" onclick="submitDesignerRating()" style="font-size:0.8rem; width:100%;">Submit Rating</button>';
-          buttons += '<div id="rating-msg" style="font-size:0.8rem; margin-top:0.25rem;"></div>';
-          buttons += '</div>';
+          buttons += '<div id="lab-rating-section" style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);"></div>';
         }
         if (status === 'in_dispute') {
           buttons += '<div class="step-card danger"><strong>⚠️ Issue Reported</strong><br>Admin is reviewing your feedback.</div>';
@@ -513,6 +506,158 @@
 
       container.innerHTML = buttons || '<p style="font-size:0.85rem; color:var(--color-muted);">No actions available</p>';
     }
+
+    // ==========================================
+    // RENDER RATING UI
+    // ==========================================
+async function renderRatingUI() {
+  var status = caseData.status;
+  var role = currentUser.user_metadata ? currentUser.user_metadata.role : 'lab';
+  var userId = currentUser.id;
+  
+  if (status !== 'approved') return;
+  
+  var ratings = await getCaseRatings(caseId);
+console.log('📊 Ratings for case:', JSON.stringify(ratings)); 
+  console.log('👤 Current user ID:', userId);
+  console.log('👤 Current role:', role);
+  
+  // ==========================================
+  // LAB: Rate designer
+  // ==========================================
+  if (role === 'lab' && caseData.lab_id === userId) {
+    var section = document.getElementById('lab-rating-section');
+    if (!section) return;
+    
+    // Find if this lab already rated the designer for this case
+    var alreadyRated = null;
+    for (var i = 0; i < ratings.length; i++) {
+      if (ratings[i].reviewer_id === userId && ratings[i].rated_user_role === 'designer') {
+        alreadyRated = ratings[i];
+        break;
+      }
+    }
+    
+    console.log('🔍 Lab already rated designer?', alreadyRated ? 'YES' : 'NO');
+    
+    if (alreadyRated) {
+      // SHOW SUBMITTED RATING
+      var stars = '';
+      for (var s = 1; s <= 5; s++) {
+        stars += '<span style="color:' + (s <= alreadyRated.rating ? '#f59e0b' : '#d1d5db') + '; font-size:1.2rem;">★</span>';
+      }
+      section.innerHTML = 
+        '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.35rem;">⭐ Your Rating for Designer</div>' +
+        '<div style="margin-bottom:0.25rem;">' + stars + '</div>' +
+        (alreadyRated.comment ? '<div style="font-size:0.82rem; color:var(--color-muted); font-style:italic;">"' + alreadyRated.comment + '"</div>' : '') +
+        '<div style="font-size:0.72rem; color:var(--color-muted); margin-top:0.25rem;">✅ Submitted. Cannot be changed.</div>';
+    } else {
+      // SHOW RATING FORM
+      section.innerHTML = 
+        '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">⭐ Rate the Designer</div>' +
+        '<div id="rating-stars" class="rating-stars">' +
+          '<span onclick="setRating(1)" id="star-1" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setRating(2)" id="star-2" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setRating(3)" id="star-3" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setRating(4)" id="star-4" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setRating(5)" id="star-5" style="color:#d1d5db;">★</span>' +
+        '</div>' +
+        '<textarea id="rating-comment" placeholder="Leave a comment (optional)" rows="2" style="font-size:0.85rem;"></textarea>' +
+        '<button class="secondary mt-1" onclick="submitDesignerRating()" style="font-size:0.8rem; width:100%;">Submit Rating</button>' +
+        '<div id="rating-msg" style="font-size:0.8rem; margin-top:0.25rem;"></div>';
+    }
+    
+    // Show what the designer rated the lab (if exists)
+    var designerRatedLab = null;
+    for (var j = 0; j < ratings.length; j++) {
+      if (ratings[j].reviewer_role === 'designer' && ratings[j].rated_user_role === 'lab') {
+        designerRatedLab = ratings[j];
+        break;
+      }
+    }
+    
+    if (designerRatedLab) {
+      var dStars = '';
+      for (var k = 1; k <= 5; k++) {
+        dStars += '<span style="color:' + (k <= designerRatedLab.rating ? '#f59e0b' : '#d1d5db') + '; font-size:0.9rem;">★</span>';
+      }
+      section.innerHTML += 
+        '<div style="margin-top:0.75rem; padding-top:0.5rem; border-top:1px solid var(--color-light);">' +
+          '<div style="font-size:0.8rem; font-weight:600; color:var(--color-muted); margin-bottom:0.25rem;">Designer rated you:</div>' +
+          '<div>' + dStars + '</div>' +
+          (designerRatedLab.comment ? '<div style="font-size:0.78rem; color:var(--color-muted); font-style:italic;">"' + designerRatedLab.comment + '"</div>' : '') +
+        '</div>';
+    }
+  }
+  
+  // ==========================================
+  // DESIGNER: Rate lab
+  // ==========================================
+  if (role === 'designer' && caseData.designer_id === userId) {
+    var dSection = document.getElementById('designer-rating-section');
+    if (!dSection) return;
+    
+    // Find if this designer already rated the lab
+    var alreadyRatedLab = null;
+    for (var i = 0; i < ratings.length; i++) {
+      if (ratings[i].reviewer_id === userId && ratings[i].rated_user_role === 'lab') {
+        alreadyRatedLab = ratings[i];
+        break;
+      }
+    }
+    
+    console.log('🔍 Designer already rated lab?', alreadyRatedLab ? 'YES' : 'NO');
+    
+    if (alreadyRatedLab) {
+      // SHOW SUBMITTED RATING
+      var stars = '';
+      for (var s = 1; s <= 5; s++) {
+        stars += '<span style="color:' + (s <= alreadyRatedLab.rating ? '#f59e0b' : '#d1d5db') + '; font-size:1.2rem;">★</span>';
+      }
+      dSection.innerHTML = 
+        '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.35rem;">⭐ Your Rating for Lab</div>' +
+        '<div style="margin-bottom:0.25rem;">' + stars + '</div>' +
+        (alreadyRatedLab.comment ? '<div style="font-size:0.82rem; color:var(--color-muted); font-style:italic;">"' + alreadyRatedLab.comment + '"</div>' : '') +
+        '<div style="font-size:0.72rem; color:var(--color-muted); margin-top:0.25rem;">✅ Submitted. Cannot be changed.</div>';
+    } else {
+      // SHOW RATING FORM
+      dSection.innerHTML = 
+        '<div style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">⭐ Rate the Lab</div>' +
+        '<div id="lab-rating-stars" class="rating-stars">' +
+          '<span onclick="setLabRating(1)" id="lab-star-1" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setLabRating(2)" id="lab-star-2" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setLabRating(3)" id="lab-star-3" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setLabRating(4)" id="lab-star-4" style="color:#d1d5db;">★</span>' +
+          '<span onclick="setLabRating(5)" id="lab-star-5" style="color:#d1d5db;">★</span>' +
+        '</div>' +
+        '<textarea id="lab-rating-comment" placeholder="Leave a comment (optional)" rows="2" style="font-size:0.85rem;"></textarea>' +
+        '<button class="secondary mt-1" onclick="submitLabRating()" style="font-size:0.8rem; width:100%;">Submit Rating</button>' +
+        '<div id="lab-rating-msg" style="font-size:0.8rem; margin-top:0.25rem;"></div>';
+    }
+    
+    // Show what the lab rated the designer
+    var labRatedDesigner = null;
+    for (var j = 0; j < ratings.length; j++) {
+      if (ratings[j].reviewer_role === 'lab' && ratings[j].rated_user_role === 'designer') {
+        labRatedDesigner = ratings[j];
+        break;
+      }
+    }
+    
+    if (labRatedDesigner) {
+      var lStars = '';
+      for (var k = 1; k <= 5; k++) {
+        lStars += '<span style="color:' + (k <= labRatedDesigner.rating ? '#f59e0b' : '#d1d5db') + '; font-size:0.9rem;">★</span>';
+      }
+      dSection.innerHTML += 
+        '<div style="margin-top:0.75rem; padding-top:0.5rem; border-top:1px solid var(--color-light);">' +
+          '<div style="font-size:0.8rem; font-weight:600; color:var(--color-muted); margin-bottom:0.25rem;">Lab rated you:</div>' +
+          '<div>' + lStars + '</div>' +
+          (labRatedDesigner.comment ? '<div style="font-size:0.78rem; color:var(--color-muted); font-style:italic;">"' + labRatedDesigner.comment + '"</div>' : '') +
+        '</div>';
+    }
+  }
+}
 
     // ==========================================
     // DESIGNER ACTIONS
@@ -616,7 +761,7 @@
     }
 
     // ==========================================
-    // RATING SYSTEM
+    // RATING SUBMIT FUNCTIONS
     // ==========================================
     window.setRating = function(rating) {
       selectedRating = rating;
@@ -632,18 +777,16 @@
         document.getElementById('rating-msg').style.color = 'var(--color-danger)';
         return;
       }
-      var comment = document.getElementById('rating-comment').value.trim();
-      if (!caseData.designer_id) { document.getElementById('rating-msg').textContent = 'No designer assigned.'; return; }
+      var comment = document.getElementById('rating-comment') ? document.getElementById('rating-comment').value.trim() : '';
       var result = await submitRating(caseId, currentUser.id, caseData.designer_id, selectedRating, comment || null);
-      if (result.error) {
-        document.getElementById('rating-msg').textContent = 'Error: ' + result.error.message;
+      if (result && result.error) {
+        document.getElementById('rating-msg').textContent = result.error;
         document.getElementById('rating-msg').style.color = 'var(--color-danger)';
         return;
       }
-      document.getElementById('rating-msg').textContent = '✅ Rating submitted!';
+      document.getElementById('rating-msg').textContent = '✅ ' + (result.message || 'Rating submitted!');
       document.getElementById('rating-msg').style.color = 'var(--color-success)';
-      for (var i = 1; i <= 5; i++) { var star = document.getElementById('star-' + i); if (star) star.style.cursor = 'default'; }
-      document.getElementById('rating-comment').disabled = true;
+      setTimeout(function() { renderRatingUI(); }, 500);
     };
 
     window.setLabRating = function(rating) {
@@ -660,17 +803,16 @@
         document.getElementById('lab-rating-msg').style.color = 'var(--color-danger)';
         return;
       }
-      var comment = document.getElementById('lab-rating-comment').value.trim();
+      var comment = document.getElementById('lab-rating-comment') ? document.getElementById('lab-rating-comment').value.trim() : '';
       var result = await submitRating(caseId, currentUser.id, caseData.lab_id, selectedLabRating, comment || null);
-      if (result.error) {
-        document.getElementById('lab-rating-msg').textContent = 'Error: ' + result.error.message;
+      if (result && result.error) {
+        document.getElementById('lab-rating-msg').textContent = result.error;
         document.getElementById('lab-rating-msg').style.color = 'var(--color-danger)';
         return;
       }
-      document.getElementById('lab-rating-msg').textContent = '✅ Rating submitted!';
+      document.getElementById('lab-rating-msg').textContent = '✅ ' + (result.message || 'Rating submitted!');
       document.getElementById('lab-rating-msg').style.color = 'var(--color-success)';
-      for (var i = 1; i <= 5; i++) { var star = document.getElementById('lab-star-' + i); if (star) star.style.cursor = 'default'; }
-      document.getElementById('lab-rating-comment').disabled = true;
+      setTimeout(function() { renderRatingUI(); }, 500);
     };
 
     // ==========================================
